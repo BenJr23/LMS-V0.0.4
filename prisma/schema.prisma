@@ -132,14 +132,14 @@ model Submission {
 }
 
 model Student {
-  id              String    @id // Clerk User ID
-  fetchID         Int       @unique
+  id              String    @id @default(cuid())
+  fetchID         Int
   name            String
-  email           String    @unique
-  role            String    @default("Student")
+  email           String    
+  role            String    
   gradeLevel      String
-  status          String    @default("active")
-  studentNumber   String    @unique
+  status          String    
+  studentNumber   String    
   dateOfBirth     DateTime
   gender          String
   guardianName    String
