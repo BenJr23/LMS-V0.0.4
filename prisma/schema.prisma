@@ -59,12 +59,8 @@ model Requirement {
 model Enrolment {
   id                String          @id @default(cuid())
   subjectInstanceId String
-  studentId         String
+  studentId         String          //clerk ID
   code              Int
-  fullName          String
-  email             String
-  gradeLevel        String
-  status            String
   hasNewContent     Boolean         @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt

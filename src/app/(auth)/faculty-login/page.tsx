@@ -17,7 +17,8 @@ export default function Home() {
   const router = useRouter();
   const { signIn, isLoaded } = useSignIn();
 
-  const emailRegex = /^[a-zA-Z0-9._%+-]{3,40}@[a-zA-Z0-9.-]+\.(com)$/;
+  // More flexible email regex that accepts common email formats
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,14}$/;
 
   const isEmailValid = emailRegex.test(email);
@@ -41,7 +42,7 @@ export default function Home() {
     setError(null);
     setIsLoading(true);
 
-    if (!isLoaded || !isEmailValid || !isPasswordValid) {
+    if (!isLoaded) {
       setIsLoading(false);
       return;
     }
@@ -57,8 +58,9 @@ export default function Home() {
         setError(errorMsg);
         toast.error(errorMsg);
       }
-    } catch {
-      const errorMsg = 'Invalid email or password';
+    } catch (err: any) {
+      console.error('Login error:', err);
+      const errorMsg = err?.errors?.[0]?.message || 'Invalid email or password';
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -110,7 +112,7 @@ export default function Home() {
               <div className="min-h-[1rem]">
                 {touched.email && email !== '' && !isEmailValid && (
                   <p className="text-[10px] text-red-600 mt-1">
-                    Email must be 3–40 characters followed by @domain.com
+                    Please enter a valid email address
                   </p>
                 )}
               </div>
@@ -158,8 +160,8 @@ export default function Home() {
 
             <button
               type="submit"
-              disabled={!isEmailValid || !isPasswordValid || isLoading}
-              className={`w-full py-2 rounded-md transition ${!isEmailValid || !isPasswordValid || isLoading
+              disabled={isLoading}
+              className={`w-full py-2 rounded-md transition ${isLoading
                 ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                 : 'bg-red-700 text-white hover:bg-red-800'
                 }`}
