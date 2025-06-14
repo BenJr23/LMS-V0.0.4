@@ -152,7 +152,7 @@ model Student {
 }
 
 model Faculty {
-  id              String    @id // Clerk User ID
+  id              String    @id @default(cuid())
   email           String
   role            String 
 }
