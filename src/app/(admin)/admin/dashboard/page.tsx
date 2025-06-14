@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { getSubjects, createSubject } from '@/app/_actions/subject';
+import { getSubjects, createSubject, updateSubject, deleteSubject } from '@/app/_actions/subject';
 import { Plus, Search, X, CheckCircle2, AlertCircle, Pencil, Trash2 } from 'lucide-react';
 
 type Subject = {
@@ -23,8 +23,17 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [newSubject, setNewSubject] = useState({
+    name: '',
+    code: '',
+  });
+  const [editSubject, setEditSubject] = useState({
     name: '',
     code: '',
   });
@@ -50,7 +59,7 @@ export default function AdminDashboard() {
     };
 
     if (user) {
-      fetchSubjects();
+    fetchSubjects();
     }
   }, [user]);
 
@@ -137,6 +146,153 @@ export default function AdminDashboard() {
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleEditSubject = async () => {
+    if (!selectedSubject) return;
+
+    try {
+      setIsEditing(true);
+      const updatedSubject = await updateSubject({
+        id: selectedSubject.id,
+        name: editSubject.name,
+        code: editSubject.code,
+      });
+      
+      setSubjects(prev => prev.map(subject => 
+        subject.id === updatedSubject.id ? updatedSubject : subject
+      ));
+
+      toast.custom((t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-white/95 backdrop-blur-sm shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black/5 z-50`}
+        >
+          <div className="flex-1 w-0 p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 pt-0.5">
+                <CheckCircle2 className="h-10 w-10 text-green-500" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  Subject Updated Successfully
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {updatedSubject.name} has been updated.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ), {
+        duration: 4000,
+        position: 'top-center',
+      });
+
+      setIsEditModalOpen(false);
+      setSelectedSubject(null);
+      setEditSubject({ name: '', code: '' });
+    } catch (error) {
+      toast.custom((t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-white/95 backdrop-blur-sm shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black/5`}
+        >
+          <div className="flex-1 w-0 p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 pt-0.5">
+                <AlertCircle className="h-10 w-10 text-red-500" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  Error Updating Subject
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {error instanceof Error ? error.message : 'Failed to update subject'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ), {
+        duration: 4000,
+        position: 'top-center',
+      });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleDeleteSubject = async () => {
+    if (!selectedSubject) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteSubject(selectedSubject.id);
+      
+      setSubjects(prev => prev.filter(subject => subject.id !== selectedSubject.id));
+
+      toast.custom((t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-white/95 backdrop-blur-sm shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black/5 z-50`}
+        >
+          <div className="flex-1 w-0 p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 pt-0.5">
+                <CheckCircle2 className="h-10 w-10 text-green-500" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  Subject Deleted Successfully
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {selectedSubject.name} has been removed from the subjects list.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ), {
+        duration: 4000,
+        position: 'top-center',
+      });
+
+      setIsDeleteModalOpen(false);
+      setSelectedSubject(null);
+    } catch (error) {
+      toast.custom((t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-white/95 backdrop-blur-sm shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black/5`}
+        >
+          <div className="flex-1 w-0 p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 pt-0.5">
+                <AlertCircle className="h-10 w-10 text-red-500" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  Error Deleting Subject
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {error instanceof Error ? error.message : 'Failed to delete subject'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ), {
+        duration: 4000,
+        position: 'top-center',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -246,33 +402,12 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
-                              // TODO: Implement edit functionality
-                              toast.custom((t) => (
-                                <div
-                                  className={`${
-                                    t.visible ? 'animate-enter' : 'animate-leave'
-                                  } max-w-md w-full bg-white/95 backdrop-blur-sm shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black/5 z-50`}
-                                >
-                                  <div className="flex-1 w-0 p-4">
-                                    <div className="flex items-start">
-                                      <div className="flex-shrink-0 pt-0.5">
-                                        <AlertCircle className="h-10 w-10 text-yellow-500" />
-                                      </div>
-                                      <div className="ml-3 flex-1">
-                                        <p className="text-sm font-medium text-gray-900">
-                                          Edit Functionality Coming Soon
-                                        </p>
-                                        <p className="mt-1 text-sm text-gray-500">
-                                          This feature is currently under development.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ), {
-                                duration: 4000,
-                                position: 'top-center',
+                              setSelectedSubject(subject);
+                              setEditSubject({
+                                name: subject.name,
+                                code: subject.code,
                               });
+                              setIsEditModalOpen(true);
                             }}
                             className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
                             title="Edit Subject"
@@ -281,33 +416,8 @@ export default function AdminDashboard() {
                           </button>
                           <button
                             onClick={() => {
-                              // TODO: Implement delete functionality
-                              toast.custom((t) => (
-                                <div
-                                  className={`${
-                                    t.visible ? 'animate-enter' : 'animate-leave'
-                                  } max-w-md w-full bg-white/95 backdrop-blur-sm shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black/5 z-50`}
-                                >
-                                  <div className="flex-1 w-0 p-4">
-                                    <div className="flex items-start">
-                                      <div className="flex-shrink-0 pt-0.5">
-                                        <AlertCircle className="h-10 w-10 text-yellow-500" />
-                                      </div>
-                                      <div className="ml-3 flex-1">
-                                        <p className="text-sm font-medium text-gray-900">
-                                          Delete Functionality Coming Soon
-                                        </p>
-                                        <p className="mt-1 text-sm text-gray-500">
-                                          This feature is currently under development.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ), {
-                                duration: 4000,
-                                position: 'top-center',
-                              });
+                              setSelectedSubject(subject);
+                              setIsDeleteModalOpen(true);
                             }}
                             className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
                             title="Delete Subject"
@@ -393,6 +503,120 @@ export default function AdminDashboard() {
                   </>
                 ) : (
                   'Create Subject'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Subject Modal */}
+      {isEditModalOpen && selectedSubject && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Edit Subject</h3>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedSubject(null);
+                  setEditSubject({ name: '', code: '' });
+                }}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label htmlFor="editSubjectName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Subject Name
+                </label>
+                <input
+                  type="text"
+                  id="editSubjectName"
+                  value={editSubject.name}
+                  onChange={(e) => setEditSubject(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent text-gray-900 placeholder-gray-500 bg-white"
+                  placeholder="Enter subject name"
+                />
+              </div>
+              <div>
+                <label htmlFor="editSubjectCode" className="block text-sm font-medium text-gray-700 mb-1">
+                  Subject Code
+                </label>
+                <input
+                  type="text"
+                  id="editSubjectCode"
+                  value={editSubject.code}
+                  onChange={(e) => setEditSubject(prev => ({ ...prev, code: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent text-gray-900 placeholder-gray-500 bg-white"
+                  placeholder="Enter subject code"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={handleEditSubject}
+                disabled={!editSubject.name || !editSubject.code || isEditing}
+                className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isEditing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Subject Modal */}
+      {isDeleteModalOpen && selectedSubject && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Delete Subject</h3>
+              <button
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSelectedSubject(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-12 w-12 text-red-500" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-medium text-gray-900">Are you sure?</h4>
+                  <p className="mt-1 text-sm text-gray-500">
+                    This action cannot be undone. This will permanently delete the subject "{selectedSubject.name}".
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={handleDeleteSubject}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Subject'
                 )}
               </button>
             </div>
