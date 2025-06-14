@@ -23,6 +23,7 @@ model Subject {
 model SubjectInstance {
   id               String            @id @default(cuid())
   subjectId        String
+  userId           String            //clerkuserID
   teacherName      String
   grade            String
   section          String
@@ -59,6 +60,7 @@ model Enrolment {
   id                String          @id @default(cuid())
   subjectInstanceId String
   studentId         String          //clerk ID
+  email             String          @unique
   code              Int
   hasNewContent     Boolean         @default(false)
   createdAt         DateTime        @default(now())
