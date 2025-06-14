@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -22,49 +16,50 @@ model Subject {
   createdById String
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+
   instances   SubjectInstance[]
 }
 
 model SubjectInstance {
   id               String            @id @default(cuid())
+  subjectId        String
   teacherName      String
   grade            String
   section          String
   enrollment       Int
-  icon             String
-  subjectId        String
-  createdById      String
-  createdAt        DateTime          @default(now())
   enrolmentCode    Int
+  icon             String
+  createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
+  subject          Subject           @relation(fields: [subjectId], references: [id])
   announcements    Announcement[]
   enrolments       Enrolment[]
   moduleFolders    ModuleFolder[]
   requirements     Requirement[]
-  subject          Subject           @relation(fields: [subjectId], references: [id])
   uploadedContents UploadedContent[]
 }
 
 model Requirement {
   id                String          @id @default(cuid())
-  title             String?
-  content           String?
+  subjectInstanceId String
+  title             String
+  content           String
   scoreBase         Int
   deadline          DateTime
   type              String
-  subjectInstanceId String
+  requirementNumber Int
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-  requirementNumber Int
-  createdById       String
+
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
   submissions       Submission[]
 }
 
 model Enrolment {
   id                String          @id @default(cuid())
-  userId            String
   subjectInstanceId String
+  studentId         String
   code              Int
   fullName          String
   email             String
@@ -73,10 +68,12 @@ model Enrolment {
   hasNewContent     Boolean         @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
+  student           Student         @relation(fields: [studentId], references: [id])
   submissions       Submission[]
 
-  @@unique([userId, subjectInstanceId])
+  @@unique([subjectInstanceId, studentId])  // prevent duplicate enrolment per subject instance
 }
 
 model Announcement {
@@ -87,17 +84,19 @@ model Announcement {
   content           String
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
 }
 
 model ModuleFolder {
-  id                String            @id @default(cuid())
+  id                String          @id @default(cuid())
   subjectInstanceId String
   userId            String
   folderName        String
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  subjectInstance   SubjectInstance   @relation(fields: [subjectInstanceId], references: [id])
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
   uploadedContents  UploadedContent[]
 }
 
@@ -109,6 +108,7 @@ model UploadedContent {
   filePath          String
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
   moduleFolder      ModuleFolder    @relation(fields: [moduleFolderId], references: [id])
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
 }
@@ -118,14 +118,35 @@ model Submission {
   requirementId String
   enrollmentId  String
   userId        String
-  title         String?
-  content       String?
-  filePath      String?
+  title         String
+  content       String
+  filePath      String
   graded        Boolean     @default(false)
   score         Float?
   feedback      String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  enrollment    Enrolment   @relation(fields: [enrollmentId], references: [id])
+
   requirement   Requirement @relation(fields: [requirementId], references: [id])
+  enrollment    Enrolment   @relation(fields: [enrollmentId], references: [id])
+}
+
+model Student {
+  id              String    @id // Clerk User ID
+  fetchID         Int       @unique
+  name            String
+  email           String    @unique
+  role            String    @default("Student")
+  gradeLevel      String
+  status          String    @default("active")
+  studentNumber   String    @unique
+  dateOfBirth     DateTime
+  gender          String
+  guardianName    String
+  guardianContact String
+  address         String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  enrolments      Enrolment[]
 }
