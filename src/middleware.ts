@@ -10,7 +10,7 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/student-login',
   '/faculty-login',
-  '/unauthorized' // Add unauthorized page to public routes
+  '/unauthorized'
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
@@ -31,52 +31,7 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
-  // Handle login page redirects
-  if (isAuthenticated && (currentPath === '/' || currentPath === '/student-login' || currentPath === '/faculty-login')) {
-    try {
-      const user = await clerkClient.users.getUser(userId);
-      const userRole = user?.privateMetadata?.role as string;
-
-      // Log user metadata
-      console.log('👤 User Metadata:', {
-        userId,
-        role: userRole,
-        privateMetadata: user?.privateMetadata,
-        publicMetadata: user?.publicMetadata,
-        path: currentPath
-      });
-
-      if (!userRole) {
-        console.log('⚠️ No role found for user:', userId);
-        return NextResponse.next();
-      }
-
-      switch (userRole) {
-        case 'admin':
-          return NextResponse.redirect(new URL('/admin/dashboard', req.url));
-        case 'faculty':
-          return NextResponse.redirect(new URL('/faculty/dashboard', req.url));
-        case 'student':
-          return NextResponse.redirect(new URL('/student/dashboard', req.url));
-        default:
-          return NextResponse.next();
-      }
-    } catch (error) {
-      console.error('💥 Error fetching user role:', error);
-      return NextResponse.next();
-    }
-  }
-
-  // Handle unauthenticated access
-  if (!isPublicRoute(req) && !isAuthenticated) {
-    console.log('🚫 Unauthenticated access attempt:', {
-      path: currentPath,
-      isPublicRoute: isPublicRoute(req)
-    });
-    return NextResponse.redirect(new URL('/', req.url));
-  }
-
-  // Handle role-based access
+  // Handle role-based access for protected routes
   if (isAuthenticated) {
     try {
       const user = await clerkClient.users.getUser(userId);

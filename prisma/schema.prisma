@@ -150,3 +150,10 @@ model Student {
 
   enrolments      Enrolment[]
 }
+
+model Faculty {
+  id              String    @id // Clerk User ID
+  email           String
+  role            String 
+}
+
