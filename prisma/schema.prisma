@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Subject {
+  id          String            @id @default(cuid())
+  name        String
+  code        String            @unique
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  instances   SubjectInstance[]
+}
+
+model SubjectInstance {
+  id               String            @id @default(cuid())
+  teacherName      String
+  grade            String
+  section          String
+  enrollment       Int
+  icon             String
+  subjectId        String
+  createdById      String
+  createdAt        DateTime          @default(now())
+  enrolmentCode    Int
+  updatedAt        DateTime          @updatedAt
+  announcements    Announcement[]
+  enrolments       Enrolment[]
+  moduleFolders    ModuleFolder[]
+  requirements     Requirement[]
+  subject          Subject           @relation(fields: [subjectId], references: [id])
+  uploadedContents UploadedContent[]
+}
+
+model Requirement {
+  id                String          @id @default(cuid())
+  title             String?
+  content           String?
+  scoreBase         Int
+  deadline          DateTime
+  type              String
+  subjectInstanceId String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  requirementNumber Int
+  createdById       String
+  subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
+  submissions       Submission[]
+}
+
+model Enrolment {
+  id                String          @id @default(cuid())
+  userId            String
+  subjectInstanceId String
+  code              Int
+  fullName          String
+  email             String
+  gradeLevel        String
+  status            String
+  hasNewContent     Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
+  submissions       Submission[]
+
+  @@unique([userId, subjectInstanceId])
+}
+
+model Announcement {
+  id                String          @id @default(cuid())
+  subjectInstanceId String
+  userId            String
+  title             String
+  content           String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
+}
+
+model ModuleFolder {
+  id                String            @id @default(cuid())
+  subjectInstanceId String
+  userId            String
+  folderName        String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  subjectInstance   SubjectInstance   @relation(fields: [subjectInstanceId], references: [id])
+  uploadedContents  UploadedContent[]
+}
+
+model UploadedContent {
+  id                String          @id @default(cuid())
+  subjectInstanceId String
+  moduleFolderId    String
+  fileName          String
+  filePath          String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  moduleFolder      ModuleFolder    @relation(fields: [moduleFolderId], references: [id])
+  subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
+}
+
+model Submission {
+  id            String      @id @default(cuid())
+  requirementId String
+  enrollmentId  String
+  userId        String
+  title         String?
+  content       String?
+  filePath      String?
+  graded        Boolean     @default(false)
+  score         Float?
+  feedback      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  enrollment    Enrolment   @relation(fields: [enrollmentId], references: [id])
+  requirement   Requirement @relation(fields: [requirementId], references: [id])
+}
