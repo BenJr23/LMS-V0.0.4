@@ -70,10 +70,9 @@ model Enrolment {
   updatedAt         DateTime        @updatedAt
 
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
-  student           Student         @relation(fields: [studentId], references: [id])
   submissions       Submission[]
 
-  @@unique([subjectInstanceId, studentId])  // prevent duplicate enrolment per subject instance
+  @@unique([subjectInstanceId])  // prevent duplicate enrolment per subject instance
 }
 
 model Announcement {
@@ -135,7 +134,7 @@ model Student {
   id              String    @id @default(cuid())
   fetchID         Int
   name            String
-  email           String    
+  email           String    @unique
   role            String    
   gradeLevel      String
   status          String    
@@ -148,12 +147,12 @@ model Student {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  enrolments      Enrolment[]
+
 }
 
 model Faculty {
   id              String    @id @default(cuid())
-  email           String
+  email           String    @unique
   role            String 
 }
 
