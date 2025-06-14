@@ -70,7 +70,18 @@ export default function AdminDashboard() {
 
   const handleModalClose = () => {
     setIsModalOpen(false);
-    setNewSubject({ name: '', code: '' });
+    setNewSubject({ 
+      name: '', 
+      code: '' 
+    });
+    setEditSubject({ 
+      name: '', 
+      code: '' 
+    });
+    setSelectedSubject(null);
+    setIsCreating(false);
+    setIsEditing(false);
+    setIsDeleting(false);
   };
 
   const handleCreateSubject = async () => {
