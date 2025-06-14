@@ -4,11 +4,10 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Plus, Search, X, RefreshCw, ChevronDown, Image } from 'lucide-react';
+import { Plus, X, RefreshCw, ChevronDown, Image, Users } from 'lucide-react';
 import { getSubjects } from '@/app/_actions/subject';
 import { uploadSectionIcon } from '@/app/_actions/uploadSectionIcon';
-import { createSubjectInstance } from '@/app/_actions/subjectInstance';
-import { getSubjectInstances } from '@/app/_actions/subjectInstance';
+import { createSubjectInstance, getSubjectInstances } from '@/app/_actions/subjectInstance';
 
 type Subject = {
   id: string;
@@ -71,7 +70,6 @@ export default function FacultyDashboard() {
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
   const [subjectSearchQuery, setSubjectSearchQuery] = useState('');
   const subjectDropdownRef = useRef<HTMLDivElement>(null);
-  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [subjectInstances, setSubjectInstances] = useState<SubjectInstance[]>([]);
@@ -251,14 +249,16 @@ export default function FacultyDashboard() {
     try {
       setIsLoadingInstances(true);
       const result = await getSubjectInstances();
-      if (result.success) {
+      if (result.success && result.data) {
         setSubjectInstances(result.data);
       } else {
         toast.error(result.error || 'Failed to fetch sections');
+        setSubjectInstances([]);
       }
     } catch (error) {
       console.error('Error fetching sections:', error);
       toast.error('Failed to fetch sections');
+      setSubjectInstances([]);
     } finally {
       setIsLoadingInstances(false);
     }
@@ -290,68 +290,81 @@ export default function FacultyDashboard() {
     <div className="p-6">
       <Toaster />
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h1 className="text-2xl font-bold text-red-800 mb-4">Welcome, {user.firstName || 'Faculty Member'}!</h1>
-          <p className="text-gray-600">This is your faculty dashboard. More features coming soon.</p>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-[#800000]">My Teaching Sections</h2>
+            <p className="text-gray-600">Welcome back! Here are your teaching assignments.</p>
+          </div>
+          <div className="flex flex-col md:flex-row gap-2 items-center">
+            <input
+              type="text"
+              placeholder="Search by name or code..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#800000] text-sm shadow-sm bg-white text-gray-800 placeholder-gray-400"
+            />
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#800000] text-white rounded-lg hover:bg-[#600000] transition-colors duration-200 shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              Add Section
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <h2 className="text-xl font-semibold text-gray-900">Teaching Sections</h2>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search sections..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent w-full md:w-64 text-gray-900 placeholder-gray-400 bg-gray-50 hover:bg-white transition-colors duration-200"
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {isLoadingInstances ? (
+            <div className="col-span-full flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#800000]"></div>
+            </div>
+          ) : subjectInstances.length > 0 ? (
+            subjectInstances.map((instance) => (
+              <div
+                key={instance.id}
+                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] transform cursor-pointer"
+              >
+                <div className="relative h-40 w-full">
+                  <img
+                    src={instance.icon}
+                    alt={instance.subject.name}
+                    className="w-full h-full object-cover"
                   />
                 </div>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors duration-200 shadow-sm"
-                >
-                  <Plus className="h-5 w-5" />
-                  Add Section
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="p-6">
-            {isLoadingInstances ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-red-800"></div>
-              </div>
-            ) : subjectInstances.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {subjectInstances.map((instance) => (
-                  <div key={instance.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-4">
-                      <img 
-                        src={instance.icon} 
-                        alt={instance.subject.name} 
-                        className="h-16 w-16 rounded-lg object-cover"
-                      />
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{instance.subject.name}</h3>
-                        <p className="text-sm text-gray-500">{instance.subject.code}</p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {instance.grade} - Section {instance.section}
-                        </p>
-                      </div>
+
+                <div className="p-4 space-y-2">
+                  <div className="flex justify-between items-center text-sm mb-1">
+                    <span className="bg-pink-100 text-[#800000] px-2 py-0.5 rounded font-medium">
+                      {instance.subject.code}
+                    </span>
+                    <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-medium">
+                      Section {instance.section}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {instance.subject.name}
+                  </h3>
+                  <p className="text-sm text-gray-600">Grade {instance.grade}</p>
+                  <p className="text-sm text-gray-600">Teacher: {instance.teacherName}</p>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center text-gray-700 gap-1">
+                      <Users className="w-4 h-4 text-[#800000]" />
+                      Active
+                    </div>
+                    <div className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">
+                      Code: {instance.enrolmentCode}
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
-            ) : (
-              <p className="text-gray-500 text-center">No sections found. Add your first teaching section to get started.</p>
-            )}
-          </div>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-8 text-gray-500">
+              No sections found. Add your first teaching section to get started.
+            </div>
+          )}
         </div>
       </div>
 
