@@ -24,7 +24,7 @@ export async function uploadSectionIcon(file: File) {
     // Generate unique filename
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = `${user.id}/icons/${fileName}`;
+    const filePath = `icons/${fileName}`;
 
     console.log('Attempting to upload file:', {
       path: filePath,
@@ -46,16 +46,11 @@ export async function uploadSectionIcon(file: File) {
       throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabaseAdmin.storage
-      .from('lms')
-      .getPublicUrl(filePath);
-
-    console.log('Upload successful, public URL:', publicUrl);
+    console.log('Upload successful, file path:', filePath);
 
     return { 
       success: true, 
-      url: publicUrl 
+      path: filePath 
     };
   } catch (error) {
     console.error('Upload error:', error);

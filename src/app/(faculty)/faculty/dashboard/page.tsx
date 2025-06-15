@@ -4,10 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Plus, X, RefreshCw, ChevronDown, Image, Users } from 'lucide-react';
+import { Plus, X, RefreshCw, ChevronDown, Image as ImageIcon, Users } from 'lucide-react';
 import { getSubjects } from '@/app/_actions/subject';
 import { uploadSectionIcon } from '@/app/_actions/uploadSectionIcon';
 import { createSubjectInstance, getSubjectInstances } from '@/app/_actions/subjectInstance';
+import Image from 'next/image';
+import { getImageUrl } from '@/app/_actions/uploadIcon';
 
 type Subject = {
   id: string;
@@ -74,6 +76,8 @@ export default function FacultyDashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [subjectInstances, setSubjectInstances] = useState<SubjectInstance[]>([]);
   const [isLoadingInstances, setIsLoadingInstances] = useState(true);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [isImageLoading, setIsImageLoading] = useState(true);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -170,16 +174,16 @@ export default function FacultyDashboard() {
         throw new Error(result.error || 'Upload failed');
       }
 
-      if (!result.url) {
-        throw new Error('No URL returned from upload');
+      if (!result.path) {
+        throw new Error('No path returned from upload');
       }
 
-      console.log('Upload completed successfully:', result.url);
+      console.log('Upload completed successfully:', result.path);
 
       setNewSection(prev => ({ 
         ...prev, 
         photo: file,
-        photoPath: result.url 
+        photoPath: result.path 
       }));
       
       toast.success('Photo uploaded successfully');
@@ -271,6 +275,41 @@ export default function FacultyDashboard() {
     }
   }, [user]);
 
+  // Add this useEffect to handle image URLs
+  useEffect(() => {
+    const updateImageUrls = async () => {
+      setIsImageLoading(true);
+      try {
+        console.log('Starting to update image URLs for instances:', subjectInstances);
+        const newUrls: Record<string, string> = {};
+        for (const instance of subjectInstances) {
+          if (instance.icon && !imageUrls[instance.icon]) {
+            console.log('Processing icon for instance:', instance.subject.name, 'Icon path:', instance.icon);
+            try {
+              const url = await getImageUrl(instance.icon);
+              console.log('Got URL for instance:', instance.subject.name, 'URL:', url);
+              if (url) {
+                newUrls[instance.icon] = url;
+              }
+            } catch (error) {
+              console.error(`Failed to load image for ${instance.subject.name}:`, error);
+            }
+          }
+        }
+        if (Object.keys(newUrls).length > 0) {
+          console.log('Updating image URLs with new URLs:', newUrls);
+          setImageUrls(prev => ({ ...prev, ...newUrls }));
+        }
+      } catch (error) {
+        console.error('Failed to update image URLs:', error);
+      } finally {
+        setIsImageLoading(false);
+      }
+    };
+
+    updateImageUrls();
+  }, [subjectInstances, imageUrls]);
+
   const filteredSubjects = subjects.filter(subject =>
     subject.name.toLowerCase().includes(subjectSearchQuery.toLowerCase()) ||
     subject.code.toLowerCase().includes(subjectSearchQuery.toLowerCase())
@@ -325,11 +364,23 @@ export default function FacultyDashboard() {
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] transform cursor-pointer"
               >
                 <div className="relative h-40 w-full">
-                  <img
-                    src={instance.icon}
-                    alt={instance.subject.name}
-                    className="w-full h-full object-cover"
-                  />
+                  {isImageLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#800000]"></div>
+                    </div>
+                  ) : (
+                    <Image
+                      src={imageUrls[instance.icon] || '/course1.jpg'}
+                      alt={instance.subject.name || 'Subject'}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/course1.jpg';
+                      }}
+                    />
+                  )}
                 </div>
 
                 <div className="p-4 space-y-2">
@@ -547,7 +598,7 @@ export default function FacultyDashboard() {
                         <>
                           <div className="flex flex-col items-center">
                             <div className="flex items-center justify-center h-48 w-48 rounded-lg bg-gray-50">
-                              <Image className="h-12 w-12 text-gray-400" />
+                              <ImageIcon className="h-12 w-12 text-gray-400" />
                             </div>
                             <div className="mt-4 flex text-sm text-gray-600">
                               <label
