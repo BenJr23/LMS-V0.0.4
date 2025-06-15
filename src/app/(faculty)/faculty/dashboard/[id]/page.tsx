@@ -12,6 +12,7 @@ interface SubjectInstance {
   grade: string;
   section: string;
   icon: string;
+  enrollment: number;
   enrolmentCode: number;
   subject: {
     id: string;
@@ -49,6 +50,12 @@ interface SubjectInstance {
   }>;
 }
 
+const ENROLLMENT_STATUS = [
+  { value: 1, label: 'Active' },
+  { value: 0, label: 'Inactive' },
+  { value: 3, label: 'Completed' }
+] as const;
+
 export default function SubjectInstancePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const [activeTab, setActiveTab] = useState('announcements');
@@ -58,6 +65,7 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
     teacherName: '',
     grade: '',
     section: '',
+    enrollment: 1,
   });
   const [assignmentForm, setAssignmentForm] = useState({
     title: '',
@@ -80,6 +88,7 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
           teacherName: data.teacherName,
           grade: data.grade,
           section: data.section,
+          enrollment: data.enrollment,
         });
 
         // Fetch image URL
@@ -229,6 +238,28 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
                   <option value="B">B</option>
                   <option value="C">C</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Enrollment Status</label>
+                <select
+                  value={editForm.enrollment}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, enrollment: parseInt(e.target.value) }))}
+                  className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] text-gray-800 bg-white"
+                >
+                  {ENROLLMENT_STATUS.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-sm text-gray-500">
+                  Active: Currently accepting enrollments
+                  <br />
+                  Inactive: Not accepting enrollments
+                  <br />
+                  Completed: Course has ended
+                </p>
               </div>
             </div>
 

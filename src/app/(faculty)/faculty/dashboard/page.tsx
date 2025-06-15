@@ -24,6 +24,7 @@ type SubjectInstance = {
   teacherName: string;
   grade: string;
   section: string;
+  enrollment: number;
   enrolmentCode: number;
   icon: string;
   createdAt: Date;
@@ -41,6 +42,7 @@ type NewSubjectInstance = {
   grade: string;
   section: string;
   enrolmentCode: number;
+  enrollment: number;
   photo?: File;
   photoPath?: string;
 };
@@ -53,6 +55,12 @@ const GRADE_LEVELS = [
 ] as const;
 
 const SECTIONS = ['A', 'B'] as const;
+
+const ENROLLMENT_STATUS = [
+  { value: 1, label: 'Active' },
+  { value: 0, label: 'Inactive' },
+  { value: 3, label: 'Completed' }
+] as const;
 
 export default function FacultyDashboard() {
   const router = useRouter();
@@ -68,6 +76,7 @@ export default function FacultyDashboard() {
     grade: '',
     section: '',
     enrolmentCode: generateEnrollmentCode(),
+    enrollment: 1,
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
@@ -132,6 +141,7 @@ export default function FacultyDashboard() {
       grade: '',
       section: '',
       enrolmentCode: generateEnrollmentCode(),
+      enrollment: 1,
     });
     setPhotoPreview(null);
   };
@@ -230,7 +240,8 @@ export default function FacultyDashboard() {
         grade: newSection.grade,
         section: newSection.section,
         enrolmentCode: newSection.enrolmentCode,
-        icon: newSection.photoPath
+        icon: newSection.photoPath,
+        enrollment: newSection.enrollment
       });
 
       if (!result.success) {
@@ -584,6 +595,30 @@ export default function FacultyDashboard() {
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
                       This code will be used by students to enroll in this section
+                    </p>
+                  </div>
+                  <div>
+                    <label htmlFor="enrollment" className="block text-sm font-medium text-gray-700 mb-1">
+                      Enrollment Status
+                    </label>
+                    <select
+                      id="enrollment"
+                      value={newSection.enrollment}
+                      onChange={(e) => setNewSection(prev => ({ ...prev, enrollment: parseInt(e.target.value) }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent text-gray-900 bg-white"
+                    >
+                      {ENROLLMENT_STATUS.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Active: Currently accepting enrollments
+                      <br />
+                      Inactive: Not accepting enrollments
+                      <br />
+                      Completed: Course has ended
                     </p>
                   </div>
                 </div>

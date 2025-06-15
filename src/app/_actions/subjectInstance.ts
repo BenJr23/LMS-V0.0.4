@@ -12,6 +12,7 @@ type CreateSubjectInstanceInput = {
   section: string;
   enrolmentCode: number;
   icon: string;
+  enrollment: number;
 };
 
 export async function getSubjectInstances() {
@@ -79,6 +80,7 @@ export async function createSubjectInstance(data: CreateSubjectInstanceInput) {
         section: data.section,
         enrolmentCode: data.enrolmentCode,
         icon: data.icon,
+        enrollment: data.enrollment || 1, // Default to 1 (active) if not provided
       },
       include: {
         subject: true
