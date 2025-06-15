@@ -143,3 +143,78 @@ export async function getSubjectInstance(id: string) {
     throw error;
   }
 }
+
+export async function deleteSubjectInstance(id: string) {
+  try {
+    const user = await currentUser();
+
+    if (!user || !user.id) {
+      throw new Error('User not authenticated.');
+    }
+
+    // First check if the subject instance exists and belongs to the user
+    const subjectInstance = await prisma.subjectInstance.findUnique({
+      where: {
+        id: id,
+        userId: user.id
+      },
+      include: {
+        announcements: true,
+        moduleFolders: true,
+        uploadedContents: true
+      }
+    });
+
+    if (!subjectInstance) {
+      throw new Error('Subject instance not found or you do not have permission to delete it.');
+    }
+
+    // Delete all related records in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete all uploaded contents
+      if (subjectInstance.uploadedContents.length > 0) {
+        await tx.uploadedContent.deleteMany({
+          where: {
+            subjectInstanceId: id
+          }
+        });
+      }
+
+      // Delete all module folders
+      if (subjectInstance.moduleFolders.length > 0) {
+        await tx.moduleFolder.deleteMany({
+          where: {
+            subjectInstanceId: id
+          }
+        });
+      }
+
+      // Delete all announcements
+      if (subjectInstance.announcements.length > 0) {
+        await tx.announcement.deleteMany({
+          where: {
+            subjectInstanceId: id
+          }
+        });
+      }
+
+      // Finally delete the subject instance
+      await tx.subjectInstance.delete({
+        where: {
+          id: id
+        }
+      });
+    });
+
+    return {
+      success: true,
+      message: 'Subject instance and all related data deleted successfully'
+    };
+  } catch (error) {
+    console.error('Error deleting subject instance:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete subject instance'
+    };
+  }
+}

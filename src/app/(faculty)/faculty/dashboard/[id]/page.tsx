@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, use, useEffect } from 'react';
-import { Bell, FileText, ClipboardList, File, FileText as FileTextIcon, UserCircle2, Settings, MessageSquare, HelpCircle, Users, Calendar, Plus } from 'lucide-react';
-import { getSubjectInstance } from '@/app/_actions/subjectInstance';
+import { Bell, FileText, ClipboardList, File, FileText as FileTextIcon, UserCircle2, Settings, MessageSquare, HelpCircle, Users, Calendar, Plus, Eye, MoreVertical } from 'lucide-react';
+import { getSubjectInstance, deleteSubjectInstance } from '@/app/_actions/subjectInstance';
 import { getImageUrl } from '@/app/_actions/uploadIcon';
+import { createRequirement, getRequirements } from '@/app/_actions/requirement';
 import toast from 'react-hot-toast';
 import RichTextEditor from '@/components/RichTextEditor';
+import { useRouter } from 'next/navigation';
 
 interface SubjectInstance {
   id: string;
@@ -51,6 +53,19 @@ interface SubjectInstance {
   }>;
 }
 
+interface Requirement {
+  id: string;
+  title: string;
+  content: string;
+  scoreBase: number;
+  deadline: Date;
+  type: string;
+  requirementNumber: number;
+  createdAt: Date;
+  updatedAt: Date;
+  subjectInstanceId: string;
+}
+
 const ENROLLMENT_STATUS = [
   { value: 1, label: 'Active' },
   { value: 0, label: 'Inactive' },
@@ -58,6 +73,7 @@ const ENROLLMENT_STATUS = [
 ] as const;
 
 export default function SubjectInstancePage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const resolvedParams = use(params);
   const [activeTab, setActiveTab] = useState('announcements');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -78,36 +94,47 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   const [subjectInstance, setSubjectInstance] = useState<SubjectInstance | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [selectedRequirementType, setSelectedRequirementType] = useState('ASSIGNMENTS');
+  const [requirements, setRequirements] = useState<Requirement[]>([]);
 
   useEffect(() => {
-    const fetchSubjectInstance = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const data = await getSubjectInstance(resolvedParams.id);
-        setSubjectInstance(data);
+        const [subjectData, requirementsData] = await Promise.all([
+          getSubjectInstance(resolvedParams.id),
+          getRequirements(resolvedParams.id)
+        ]);
+
+        if (requirementsData.success && requirementsData.data) {
+          setRequirements(requirementsData.data);
+        } else {
+          setRequirements([]);
+        }
+
+        setSubjectInstance(subjectData);
         setEditForm({
-          teacherName: data.teacherName,
-          grade: data.grade,
-          section: data.section,
-          enrollment: data.enrollment,
+          teacherName: subjectData.teacherName,
+          grade: subjectData.grade,
+          section: subjectData.section,
+          enrollment: subjectData.enrollment,
         });
 
-        // Fetch image URL
-        if (data.icon) {
-          const url = await getImageUrl(data.icon);
+        if (subjectData.icon) {
+          const url = await getImageUrl(subjectData.icon);
           if (url) {
             setImageUrl(url);
           }
         }
       } catch (error) {
-        console.error('Error fetching subject instance:', error);
-        toast.error('Failed to load subject details');
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load data');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchSubjectInstance();
+    fetchData();
   }, [resolvedParams.id]);
 
   const tabs = [
@@ -122,6 +149,76 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
     { key: 'ASSIGNMENTS', label: 'ASSIGNMENTS', icon: <FileText className="w-5 h-5" /> },
     { key: 'ACTIVITIES', label: 'ACTIVITIES', icon: <Users className="w-5 h-5" /> }
   ];
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this subject instance? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const result = await deleteSubjectInstance(resolvedParams.id);
+      if (result.success) {
+        toast.success('Subject instance deleted successfully');
+        router.push('/faculty/dashboard'); // Redirect to dashboard after deletion
+      } else {
+        toast.error(result.error || 'Failed to delete subject instance');
+      }
+    } catch (error) {
+      console.error('Error deleting subject instance:', error);
+      toast.error('Failed to delete subject instance');
+    }
+  };
+
+  const handleAddRequirement = (type: string) => {
+    setSelectedRequirementType(type);
+    setAssignmentForm({
+      title: '',
+      content: '',
+      deadline: '',
+      baseScore: '',
+      type: type.charAt(0) + type.slice(1).toLowerCase()
+    });
+    setIsAddAssignmentModalOpen(true);
+  };
+
+  const handleCreateRequirement = async () => {
+    try {
+      if (!assignmentForm.title || !assignmentForm.content || !assignmentForm.deadline || !assignmentForm.baseScore) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      const result = await createRequirement({
+        subjectInstanceId: resolvedParams.id,
+        title: assignmentForm.title,
+        content: assignmentForm.content,
+        scoreBase: parseInt(assignmentForm.baseScore),
+        deadline: new Date(assignmentForm.deadline),
+        type: selectedRequirementType as 'FORUMS' | 'QUIZZES' | 'ASSIGNMENTS' | 'ACTIVITIES'
+      });
+
+      if (result.success) {
+        toast.success(`${assignmentForm.type} created successfully`);
+        setIsAddAssignmentModalOpen(false);
+        // Refresh both subject instance and requirements data
+        const [updatedSubject, updatedRequirements] = await Promise.all([
+          getSubjectInstance(resolvedParams.id),
+          getRequirements(resolvedParams.id)
+        ]);
+        setSubjectInstance(updatedSubject);
+        if (updatedRequirements.success && updatedRequirements.data) {
+          setRequirements(updatedRequirements.data);
+        } else {
+          setRequirements([]);
+        }
+      } else {
+        toast.error(result.error || `Failed to create ${assignmentForm.type.toLowerCase()}`);
+      }
+    } catch (error) {
+      console.error('Error creating requirement:', error);
+      toast.error(`Failed to create ${assignmentForm.type.toLowerCase()}`);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -264,19 +361,27 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex justify-between mt-6">
               <button
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors duration-200"
+                onClick={handleDelete}
+                className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors duration-200"
               >
-                Cancel
+                Delete Subject
               </button>
-              <button
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 rounded bg-[#800000] text-white hover:bg-[#600000] transition-colors duration-200"
-              >
-                Save Changes
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded bg-[#800000] text-white hover:bg-[#600000] transition-colors duration-200"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -290,9 +395,9 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
             <div className="border-b border-gray-200 px-6 py-4 sticky top-0 bg-white z-10">
               <h3 className="text-xl font-semibold text-[#800000]">Create New {assignmentForm.type}</h3>
               <p className="text-sm text-gray-500 mt-1">
-                {assignmentForm.type === 'Forum' ? 'Create a new discussion forum for students to engage in topic-related conversations.' :
-                 assignmentForm.type === 'Quiz' ? 'Create a new quiz to assess student understanding of the course material.' :
-                 assignmentForm.type === 'Activity' ? 'Create a new activity to encourage student participation and learning.' :
+                {selectedRequirementType === 'FORUMS' ? 'Create a new discussion forum for students to engage in topic-related conversations.' :
+                 selectedRequirementType === 'QUIZZES' ? 'Create a new quiz to assess student understanding of the course material.' :
+                 selectedRequirementType === 'ACTIVITIES' ? 'Create a new activity to encourage student participation and learning.' :
                  'Create a new assignment for students to complete and submit.'}
               </p>
             </div>
@@ -301,9 +406,9 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
               {/* Title Section */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  {assignmentForm.type === 'Forum' ? 'Discussion Topic' :
-                   assignmentForm.type === 'Quiz' ? 'Quiz Title' :
-                   assignmentForm.type === 'Activity' ? 'Activity Title' :
+                  {selectedRequirementType === 'FORUMS' ? 'Discussion Topic' :
+                   selectedRequirementType === 'QUIZZES' ? 'Quiz Title' :
+                   selectedRequirementType === 'ACTIVITIES' ? 'Activity Title' :
                    'Assignment Title'}
                 </label>
                 <input
@@ -318,15 +423,15 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
               {/* Content Section */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  {assignmentForm.type === 'Forum' ? 'Discussion Guidelines' :
-                   assignmentForm.type === 'Quiz' ? 'Quiz Instructions' :
-                   assignmentForm.type === 'Activity' ? 'Activity Description' :
+                  {selectedRequirementType === 'FORUMS' ? 'Discussion Guidelines' :
+                   selectedRequirementType === 'QUIZZES' ? 'Quiz Instructions' :
+                   selectedRequirementType === 'ACTIVITIES' ? 'Activity Description' :
                    'Assignment Instructions'}
                 </label>
                 <p className="text-sm text-gray-500 mb-2">
-                  {assignmentForm.type === 'Forum' ? 'Provide guidelines and topics for discussion. Students will be able to post their responses and engage with others.' :
-                   assignmentForm.type === 'Quiz' ? 'Provide clear instructions and any specific requirements for the quiz.' :
-                   assignmentForm.type === 'Activity' ? 'Describe the activity, its objectives, and what students need to do to complete it.' :
+                  {selectedRequirementType === 'FORUMS' ? 'Provide guidelines and topics for discussion. Students will be able to post their responses and engage with others.' :
+                   selectedRequirementType === 'QUIZZES' ? 'Provide clear instructions and any specific requirements for the quiz.' :
+                   selectedRequirementType === 'ACTIVITIES' ? 'Describe the activity, its objectives, and what students need to do to complete it.' :
                    'Provide detailed instructions and requirements for the assignment.'}
                 </p>
                 <RichTextEditor
@@ -341,9 +446,9 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
-                    {assignmentForm.type === 'Forum' ? 'Discussion End Date' :
-                     assignmentForm.type === 'Quiz' ? 'Quiz Deadline' :
-                     assignmentForm.type === 'Activity' ? 'Activity Deadline' :
+                    {selectedRequirementType === 'FORUMS' ? 'Discussion End Date' :
+                     selectedRequirementType === 'QUIZZES' ? 'Quiz Deadline' :
+                     selectedRequirementType === 'ACTIVITIES' ? 'Activity Deadline' :
                      'Submission Deadline'}
                   </label>
                   <input
@@ -356,9 +461,9 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
 
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
-                    {assignmentForm.type === 'Forum' ? 'Participation Points' :
-                     assignmentForm.type === 'Quiz' ? 'Quiz Points' :
-                     assignmentForm.type === 'Activity' ? 'Activity Points' :
+                    {selectedRequirementType === 'FORUMS' ? 'Participation Points' :
+                     selectedRequirementType === 'QUIZZES' ? 'Quiz Points' :
+                     selectedRequirementType === 'ACTIVITIES' ? 'Activity Points' :
                      'Maximum Points'}
                   </label>
                   <input
@@ -384,12 +489,12 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
                   Cancel
                 </button>
                 <button
-                  onClick={() => setIsAddAssignmentModalOpen(false)}
+                  onClick={handleCreateRequirement}
                   className="px-4 py-2 rounded-lg bg-[#800000] text-white hover:bg-[#600000] transition-colors duration-200 font-medium shadow-sm"
                 >
-                  {assignmentForm.type === 'Forum' ? 'Create Discussion' :
-                   assignmentForm.type === 'Quiz' ? 'Create Quiz' :
-                   assignmentForm.type === 'Activity' ? 'Create Activity' :
+                  {selectedRequirementType === 'FORUMS' ? 'Create Discussion' :
+                   selectedRequirementType === 'QUIZZES' ? 'Create Quiz' :
+                   selectedRequirementType === 'ACTIVITIES' ? 'Create Activity' :
                    'Create Assignment'}
                 </button>
               </div>
@@ -477,44 +582,82 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
         {/* Requirements Tab */}
         {activeTab === 'requirements' && (
           <div>
-            {REQUIREMENT_TYPES.map(({ key, label }) => (
-              <div key={key} className="mb-8">
-                <div className="flex items-center gap-2 mb-3">
-                  <h4 className="text-lg font-bold text-[#800000] uppercase tracking-wide flex items-center gap-2">
-                    <ClipboardList className="w-5 h-5" />
-                    {label}
-                  </h4>
-                  <button
-                    onClick={() => setIsAddAssignmentModalOpen(true)}
-                    className="p-1.5 rounded-md bg-[#800000] text-white hover:bg-[#a52a2a] transition-colors duration-200 shadow-sm"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-pink-100">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="bg-pink-50 border-b border-pink-100">
-                          <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Requirement</th>
-                          <th className="p-4 text-left font-semibold text-[#800000] w-[30%]">Title</th>
-                          <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Due Date</th>
-                          <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Points</th>
-                          <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-pink-50">
-                        <tr>
-                          <td colSpan={5} className="p-4 text-center text-gray-500 italic">
-                            No {label.toLowerCase()} available yet. Click the + button to add one.
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+            {REQUIREMENT_TYPES.map(({ key, label, icon }) => {
+              const typeRequirements = requirements.filter(req => req.type === key);
+              return (
+                <div key={key} className="mb-8">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h4 className="text-lg font-bold text-[#800000] uppercase tracking-wide flex items-center gap-2">
+                      {icon}
+                      {label}
+                    </h4>
+                    <button
+                      onClick={() => handleAddRequirement(key)}
+                      className="p-1.5 rounded-md bg-[#800000] text-white hover:bg-[#a52a2a] transition-colors duration-200 shadow-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-pink-100">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="bg-pink-50 border-b border-pink-100">
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Requirement</th>
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[30%]">Title</th>
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Due Date</th>
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Points</th>
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-pink-50">
+                          {typeRequirements.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="p-4 text-center text-gray-500 italic">
+                                No {label.toLowerCase()} available yet. Click the + button to add one.
+                              </td>
+                            </tr>
+                          ) : (
+                            typeRequirements.map((requirement) => (
+                              <tr key={requirement.id} className="hover:bg-pink-50/50">
+                                <td className="p-4 text-gray-700">
+                                  {requirement.type} {requirement.requirementNumber}
+                                </td>
+                                <td className="p-4 text-gray-700 font-medium">
+                                  {requirement.title}
+                                </td>
+                                <td className="p-4 text-gray-700">
+                                  {new Date(requirement.deadline).toLocaleDateString()}
+                                </td>
+                                <td className="p-4 text-gray-700">
+                                  {requirement.scoreBase} points
+                                </td>
+                                <td className="p-4">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      className="p-1.5 rounded-md hover:bg-pink-100 text-[#800000] transition-colors duration-200"
+                                      title="View Details"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      className="p-1.5 rounded-md hover:bg-pink-100 text-[#800000] transition-colors duration-200"
+                                      title="More Options"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
