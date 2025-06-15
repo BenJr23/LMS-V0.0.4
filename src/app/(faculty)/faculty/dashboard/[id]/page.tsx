@@ -1,55 +1,488 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, use, useEffect } from 'react';
+import { Bell, FileText, ClipboardList, File, FileText as FileTextIcon, UserCircle2, Settings, MessageSquare, HelpCircle, Users, Calendar, Plus } from 'lucide-react';
+import { getSubjectInstance } from '@/app/_actions/subjectInstance';
+import { getImageUrl } from '@/app/_actions/uploadIcon';
+import toast from 'react-hot-toast';
 
-const TABS = [
-  { id: "announcements", label: "Announcements" },
-  { id: "modules", label: "Modules" },
-  { id: "requirements", label: "Requirements" },
-];
+interface SubjectInstance {
+  id: string;
+  teacherName: string;
+  grade: string;
+  section: string;
+  icon: string;
+  enrolmentCode: number;
+  subject: {
+    id: string;
+    name: string;
+    code: string;
+    createdAt: Date;
+    updatedAt: Date;
+    createdById: string;
+  };
+  announcements: Array<{
+    id: string;
+    title: string;
+    content: string;
+    createdAt: Date;
+    updatedAt: Date;
+    userId: string;
+    subjectInstanceId: string;
+  }>;
+  moduleFolders: Array<{
+    id: string;
+    folderName: string;
+    userId: string;
+    createdAt: Date;
+    updatedAt: Date;
+    subjectInstanceId: string;
+  }>;
+  uploadedContents: Array<{
+    id: string;
+    fileName: string;
+    filePath: string;
+    createdAt: Date;
+    updatedAt: Date;
+    subjectInstanceId: string;
+    moduleFolderId: string;
+  }>;
+}
 
-export default function SubjectInstancePage({ params }: { params: { id: string } }) {
-  const [activeTab, setActiveTab] = useState("announcements");
+export default function SubjectInstancePage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const [activeTab, setActiveTab] = useState('announcements');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddAssignmentModalOpen, setIsAddAssignmentModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    teacherName: '',
+    grade: '',
+    section: '',
+  });
+  const [assignmentForm, setAssignmentForm] = useState({
+    title: '',
+    content: '',
+    deadline: '',
+    baseScore: '',
+    type: 'Assignment'
+  });
+  const [subjectInstance, setSubjectInstance] = useState<SubjectInstance | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [imageUrl, setImageUrl] = useState<string>('');
+
+  useEffect(() => {
+    const fetchSubjectInstance = async () => {
+      try {
+        setIsLoading(true);
+        const data = await getSubjectInstance(resolvedParams.id);
+        setSubjectInstance(data);
+        setEditForm({
+          teacherName: data.teacherName,
+          grade: data.grade,
+          section: data.section,
+        });
+
+        // Fetch image URL
+        if (data.icon) {
+          const url = await getImageUrl(data.icon);
+          if (url) {
+            setImageUrl(url);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching subject instance:', error);
+        toast.error('Failed to load subject details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSubjectInstance();
+  }, [resolvedParams.id]);
+
+  const tabs = [
+    { id: 'announcements', label: 'Announcements', icon: <Bell className="w-4 h-4 mr-1" /> },
+    { id: 'files', label: 'Files', icon: <FileText className="w-4 h-4 mr-1" /> },
+    { id: 'requirements', label: 'Requirements', icon: <ClipboardList className="w-4 h-4 mr-1" /> },
+  ];
+
+  const REQUIREMENT_TYPES = [
+    { key: 'FORUMS', label: 'FORUMS', icon: <MessageSquare className="w-5 h-5" /> },
+    { key: 'QUIZZES', label: 'QUIZZES', icon: <HelpCircle className="w-5 h-5" /> },
+    { key: 'ASSIGNMENTS', label: 'ASSIGNMENTS', icon: <FileText className="w-5 h-5" /> },
+    { key: 'ACTIVITIES', label: 'ACTIVITIES', icon: <Users className="w-5 h-5" /> }
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#800000]"></div>
+      </div>
+    );
+  }
+
+  if (!subjectInstance) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-[#800000] mb-2">Subject Not Found</h2>
+          <p className="text-gray-600">The requested subject could not be found.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const formatDate = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - new Date(date).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 60) return `${minutes} minutes ago`;
+    if (hours < 24) return `${hours} hours ago`;
+    return `${days} days ago`;
+  };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-4">
-        <Link href="/faculty/dashboard" className="text-blue-700 hover:underline">&larr; Back to Dashboard</Link>
+    <div className="p-0 md:p-6">
+      {/* Header Section */}
+      <div className="relative bg-gradient-to-r from-pink-100 via-white to-pink-50 rounded-lg shadow-md mb-6 overflow-hidden flex flex-col md:flex-row items-center md:items-end gap-4 md:gap-8 p-6 border border-pink-200 max-w-[1400px] mx-auto">
+        <div className="flex-shrink-0 flex flex-col items-center md:items-start">
+          <div className="bg-[#800000]/10 rounded-full p-3 mb-2">
+            {imageUrl ? (
+              <img src={imageUrl} alt={subjectInstance.subject.name} className="w-12 h-12 rounded-full object-cover" />
+            ) : (
+              <UserCircle2 className="text-[#800000] w-12 h-12" />
+            )}
+          </div>
+          <span className="bg-pink-200 text-[#800000] px-3 py-1 rounded font-bold text-sm tracking-widest shadow-sm mb-1">
+            {subjectInstance.subject.code}
+          </span>
+        </div>
+        <div className="flex-1">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-3xl font-extrabold text-gray-900 mb-1 leading-tight">
+                {subjectInstance.subject.name}
+              </h2>
+              <div className="flex flex-wrap items-center gap-4 text-base text-gray-700 mt-1">
+                <span className="flex items-center gap-1">
+                  <UserCircle2 className="w-5 h-5 text-[#800000]" />
+                  {subjectInstance.teacherName}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-5 h-5 text-[#800000]" />
+                  Grade {subjectInstance.grade} - Section {subjectInstance.section}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="p-2 hover:bg-pink-100 rounded-full transition-colors duration-200"
+            >
+              <Settings className="w-5 h-5 text-[#800000]" />
+            </button>
       </div>
-      <h1 className="text-2xl font-bold mb-6">Subject Instance: {params.id}</h1>
-      <div className="flex gap-4 border-b mb-6">
-        {TABS.map((tab) => (
+        </div>
+      </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <h3 className="text-xl font-semibold text-[#800000] mb-4">Edit Subject Instance</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teacher Name</label>
+                <input
+                  type="text"
+                  value={editForm.teacherName}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, teacherName: e.target.value }))}
+                  className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] text-gray-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                <select
+                  value={editForm.grade}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, grade: e.target.value }))}
+                  className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] text-gray-800 bg-white"
+                >
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
+                <select
+                  value={editForm.section}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, section: e.target.value }))}
+                  className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] text-gray-800 bg-white"
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 rounded bg-[#800000] text-white hover:bg-[#600000] transition-colors duration-200"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Requirement Modal */}
+      {isAddAssignmentModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl my-8">
+            {/* Modal Header */}
+            <div className="border-b border-gray-200 px-6 py-4 sticky top-0 bg-white z-10">
+              <h3 className="text-xl font-semibold text-[#800000]">Create New {assignmentForm.type}</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {assignmentForm.type === 'Forum' ? 'Create a new discussion forum for students to engage in topic-related conversations.' :
+                 assignmentForm.type === 'Quiz' ? 'Create a new quiz to assess student understanding of the course material.' :
+                 assignmentForm.type === 'Activity' ? 'Create a new activity to encourage student participation and learning.' :
+                 'Create a new assignment for students to complete and submit.'}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[calc(100vh-16rem)] overflow-y-auto">
+              {/* Title Section */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  {assignmentForm.type === 'Forum' ? 'Discussion Topic' :
+                   assignmentForm.type === 'Quiz' ? 'Quiz Title' :
+                   assignmentForm.type === 'Activity' ? 'Activity Title' :
+                   'Assignment Title'}
+                </label>
+                <input
+                  type="text"
+                  value={assignmentForm.title}
+                  onChange={(e) => setAssignmentForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200"
+                  placeholder={`Enter ${assignmentForm.type.toLowerCase()} title`}
+                />
+              </div>
+
+              {/* Content Section */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  {assignmentForm.type === 'Forum' ? 'Discussion Guidelines' :
+                   assignmentForm.type === 'Quiz' ? 'Quiz Instructions' :
+                   assignmentForm.type === 'Activity' ? 'Activity Description' :
+                   'Assignment Instructions'}
+                </label>
+                <p className="text-sm text-gray-500 mb-2">
+                  {assignmentForm.type === 'Forum' ? 'Provide guidelines and topics for discussion. Students will be able to post their responses and engage with others.' :
+                   assignmentForm.type === 'Quiz' ? 'Provide clear instructions and any specific requirements for the quiz.' :
+                   assignmentForm.type === 'Activity' ? 'Describe the activity, its objectives, and what students need to do to complete it.' :
+                   'Provide detailed instructions and requirements for the assignment.'}
+                </p>
+                <textarea
+                  value={assignmentForm.content}
+                  onChange={(e) => setAssignmentForm(prev => ({ ...prev, content: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200 min-h-[300px]"
+                  placeholder={`Enter ${assignmentForm.type.toLowerCase()} instructions here...`}
+                />
+              </div>
+
+              {/* Deadline and Score Section */}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {assignmentForm.type === 'Forum' ? 'Discussion End Date' :
+                     assignmentForm.type === 'Quiz' ? 'Quiz Deadline' :
+                     assignmentForm.type === 'Activity' ? 'Activity Deadline' :
+                     'Submission Deadline'}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={assignmentForm.deadline}
+                    onChange={(e) => setAssignmentForm(prev => ({ ...prev, deadline: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {assignmentForm.type === 'Forum' ? 'Participation Points' :
+                     assignmentForm.type === 'Quiz' ? 'Quiz Points' :
+                     assignmentForm.type === 'Activity' ? 'Activity Points' :
+                     'Maximum Points'}
+                  </label>
+                  <input
+                    type="number"
+                    value={assignmentForm.baseScore}
+                    onChange={(e) => setAssignmentForm(prev => ({ ...prev, baseScore: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200"
+                    placeholder={`Enter ${assignmentForm.type.toLowerCase()} points`}
+                    min="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 rounded-b-xl sticky bottom-0">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setIsAddAssignmentModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-200 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setIsAddAssignmentModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-[#800000] text-white hover:bg-[#600000] transition-colors duration-200 font-medium shadow-sm"
+                >
+                  {assignmentForm.type === 'Forum' ? 'Create Discussion' :
+                   assignmentForm.type === 'Quiz' ? 'Create Quiz' :
+                   assignmentForm.type === 'Activity' ? 'Create Activity' :
+                   'Create Assignment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Container */}
+      <div className="max-w-[1400px] mx-auto">
+        {/* Tabs */}
+        <div className="border-b border-gray-200 flex gap-6 text-base font-semibold text-gray-700 mb-6">
+          {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`py-2 px-4 -mb-px border-b-2 transition-colors duration-200 ${
-              activeTab === tab.id
-                ? "border-blue-700 text-blue-700 font-semibold"
-                : "border-transparent text-gray-500 hover:text-blue-700"
-            }`}
             onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center px-4 py-2 border-b-2 transition-all duration-150 rounded-t-md focus:outline-none
+                ${activeTab === tab.id
+                  ? 'border-[#800000] text-[#800000] bg-pink-50 shadow-sm'
+                  : 'border-transparent hover:text-[#800000] hover:bg-pink-100'}
+              `}
           >
+              {tab.icon}
             {tab.label}
           </button>
         ))}
       </div>
-      <div className="bg-white rounded shadow p-6 min-h-[200px]">
-        {activeTab === "announcements" && (
-          <div>
-            <h2 className="text-xl font-semibold mb-2">Announcements</h2>
-            <p className="text-gray-600">No announcements yet.</p>
+
+        {/* Announcements Tab */}
+        {activeTab === 'announcements' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-[#800000] mb-2 flex items-center gap-2">
+              <Bell className="w-5 h-5" /> Announcements
+            </h3>
+            {subjectInstance.announcements.map((item) => (
+              <div key={item.id} className="bg-white rounded-lg p-5 shadow flex gap-4 border-l-4 border-[#800000]/80">
+                <div className="flex flex-col items-center pt-1">
+                  <Bell className="text-[#800000] w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-[#800000] text-lg">{item.title}</h4>
+                  <p className="text-xs text-gray-500 mb-1">{subjectInstance.teacherName} • {formatDate(item.createdAt)}</p>
+                  <p className="mt-1 text-gray-800 text-sm">{item.content}</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
-        {activeTab === "modules" && (
-          <div>
-            <h2 className="text-xl font-semibold mb-2">Modules</h2>
-            <p className="text-gray-600">No modules yet.</p>
+
+        {/* Files Tab */}
+        {activeTab === 'files' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-[#800000] mb-2 flex items-center gap-2">
+              <FileTextIcon className="w-5 h-5" /> Course Files
+            </h3>
+            {subjectInstance.moduleFolders.map((mod) => (
+              <div key={mod.id} className="bg-white rounded-lg p-4 shadow border border-pink-100">
+                <h4 className="font-medium text-gray-900 mb-2">{mod.folderName}</h4>
+                {subjectInstance.uploadedContents.filter(content => content.moduleFolderId === mod.id).length === 0 ? (
+                  <div className="text-gray-400 italic text-sm">No files available for this module.</div>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {subjectInstance.uploadedContents
+                      .filter(content => content.moduleFolderId === mod.id)
+                      .map((file) => (
+                        <li key={file.id} className="flex items-center justify-between text-sm text-gray-700 border-b pb-1 last:border-b-0">
+                          <span className="flex items-center gap-2">
+                            {file.fileName.toLowerCase().endsWith('.pdf') ? <FileText className="w-4 h-4 text-red-500" /> : 
+                             file.fileName.toLowerCase().endsWith('.pptx') ? <FileText className="w-4 h-4 text-orange-500" /> : 
+                             <File className="w-4 h-4 text-gray-400" />}
+                            {file.fileName}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(file.updatedAt).toLocaleDateString()}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            ))}
           </div>
         )}
-        {activeTab === "requirements" && (
+
+        {/* Requirements Tab */}
+        {activeTab === 'requirements' && (
           <div>
-            <h2 className="text-xl font-semibold mb-2">Requirements</h2>
-            <p className="text-gray-600">No requirements yet.</p>
+            {REQUIREMENT_TYPES.map(({ key, label }) => (
+              <div key={key} className="mb-8">
+                <div className="flex items-center gap-2 mb-3">
+                  <h4 className="text-lg font-bold text-[#800000] uppercase tracking-wide flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5" />
+                    {label}
+                  </h4>
+                  <button
+                    onClick={() => setIsAddAssignmentModalOpen(true)}
+                    className="p-1.5 rounded-md bg-[#800000] text-white hover:bg-[#a52a2a] transition-colors duration-200 shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-pink-100">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-pink-50 border-b border-pink-100">
+                          <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Requirement</th>
+                          <th className="p-4 text-left font-semibold text-[#800000] w-[30%]">Title</th>
+                          <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Due Date</th>
+                          <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Points</th>
+                          <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-pink-50">
+                        <tr>
+                          <td colSpan={5} className="p-4 text-center text-gray-500 italic">
+                            No {label.toLowerCase()} available yet. Click the + button to add one.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

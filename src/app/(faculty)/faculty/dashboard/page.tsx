@@ -10,6 +10,7 @@ import { uploadSectionIcon } from '@/app/_actions/uploadSectionIcon';
 import { createSubjectInstance, getSubjectInstances } from '@/app/_actions/subjectInstance';
 import Image from 'next/image';
 import { getImageUrl } from '@/app/_actions/uploadIcon';
+import Link from "next/link";
 
 type Subject = {
   id: string;
@@ -371,9 +372,10 @@ export default function FacultyDashboard() {
             </div>
           ) : filteredSubjectInstances.length > 0 ? (
             filteredSubjectInstances.map((instance) => (
-              <div
+              <Link
                 key={instance.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] transform cursor-pointer"
+                href={`/faculty/dashboard/${instance.id}`}
+                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] transform cursor-pointer block"
               >
                 <div className="relative h-40 w-full">
                   {isImageLoading ? (
@@ -421,7 +423,7 @@ export default function FacultyDashboard() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))
           ) : (
             <div className="col-span-full text-center py-8 text-gray-500">

@@ -97,3 +97,47 @@ export async function createSubjectInstance(data: CreateSubjectInstanceInput) {
     };
   }
 }
+
+export async function getSubjectInstance(id: string) {
+  try {
+    const user = await currentUser();
+
+    if (!user || !user.id) {
+      throw new Error('User not authenticated.');
+    }
+
+    const subjectInstance = await prisma.subjectInstance.findUnique({
+      where: {
+        id: id,
+        userId: user.id
+      },
+      include: {
+        subject: true,
+        announcements: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
+        moduleFolders: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
+        uploadedContents: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!subjectInstance) {
+      throw new Error('Subject instance not found.');
+    }
+
+    return subjectInstance;
+  } catch (error) {
+    console.error('Error fetching subject instance:', error);
+    throw error;
+  }
+}

@@ -27,6 +27,7 @@ model SubjectInstance {
   teacherName      String
   grade            String
   section          String
+  enrollment       Int               @default(1)  // 1 for active, 0 for inactive
   enrolmentCode    Int
   icon             String
   createdAt        DateTime          @default(now())
