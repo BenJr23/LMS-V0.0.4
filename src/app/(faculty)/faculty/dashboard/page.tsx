@@ -317,6 +317,18 @@ export default function FacultyDashboard() {
 
   const selectedSubject = subjects.find(subject => subject.id === newSection.subjectId);
 
+  // Add this filtered list for subject instances
+  const filteredSubjectInstances = subjectInstances.filter((instance) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      instance.subject.name.toLowerCase().includes(query) ||
+      instance.subject.code.toLowerCase().includes(query) ||
+      instance.teacherName.toLowerCase().includes(query) ||
+      instance.grade.toLowerCase().includes(query) ||
+      instance.section.toLowerCase().includes(query)
+    );
+  });
+
   if (!isLoaded || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -357,8 +369,8 @@ export default function FacultyDashboard() {
             <div className="col-span-full flex justify-center items-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#800000]"></div>
             </div>
-          ) : subjectInstances.length > 0 ? (
-            subjectInstances.map((instance) => (
+          ) : filteredSubjectInstances.length > 0 ? (
+            filteredSubjectInstances.map((instance) => (
               <div
                 key={instance.id}
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] transform cursor-pointer"
