@@ -370,14 +370,14 @@ export default function FacultyDashboard() {
                     </div>
                   ) : (
                     <Image
-                      src={imageUrls[instance.icon] || '/course1.jpg'}
+                      src={imageUrls[instance.icon] || '/assets/depositphotos_121012076-stock-illustration-blank-photo-icon.jpg'}
                       alt={instance.subject.name || 'Subject'}
                       fill
                       className="object-cover"
                       unoptimized
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.src = '/course1.jpg';
+                        target.src = '/assets/depositphotos_121012076-stock-illustration-blank-photo-icon.jpg';
                       }}
                     />
                   )}

@@ -8,6 +8,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// path should be like 'subject-icons/filename.png' relative to the lms bucket
 export async function getImageUrl(path: string) {
   try {
     if (!path) {

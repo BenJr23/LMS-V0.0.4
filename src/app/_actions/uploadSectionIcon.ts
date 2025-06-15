@@ -24,7 +24,7 @@ export async function uploadSectionIcon(file: File) {
     // Generate unique filename
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = `icons/${fileName}`;
+    const filePath = `subject-icons/${fileName}`;
 
     console.log('Attempting to upload file:', {
       path: filePath,
