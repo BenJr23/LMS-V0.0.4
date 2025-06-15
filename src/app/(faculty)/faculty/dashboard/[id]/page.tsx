@@ -5,6 +5,7 @@ import { Bell, FileText, ClipboardList, File, FileText as FileTextIcon, UserCirc
 import { getSubjectInstance } from '@/app/_actions/subjectInstance';
 import { getImageUrl } from '@/app/_actions/uploadIcon';
 import toast from 'react-hot-toast';
+import RichTextEditor from '@/components/RichTextEditor';
 
 interface SubjectInstance {
   id: string;
@@ -328,11 +329,11 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
                    assignmentForm.type === 'Activity' ? 'Describe the activity, its objectives, and what students need to do to complete it.' :
                    'Provide detailed instructions and requirements for the assignment.'}
                 </p>
-                <textarea
-                  value={assignmentForm.content}
-                  onChange={(e) => setAssignmentForm(prev => ({ ...prev, content: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200 min-h-[300px]"
+                <RichTextEditor
+                  content={assignmentForm.content}
+                  onChange={(content) => setAssignmentForm(prev => ({ ...prev, content }))}
                   placeholder={`Enter ${assignmentForm.type.toLowerCase()} instructions here...`}
+                  className="min-h-[300px]"
                 />
               </div>
 
