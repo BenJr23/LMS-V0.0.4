@@ -1,9 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Users, Clock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { getEnrolledSubjects } from '@/app/_actions/enrolledsubjects';
+import { toast } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
+import { getImageUrl } from '@/app/_actions/uploadIcon';
 
 interface EnrolledSubject {
   id: string;
@@ -24,57 +28,79 @@ interface EnrolledSubject {
   createdAt: Date;
 }
 
-// Mock data for development
-const mockEnrolledSubjects: EnrolledSubject[] = [
-  {
-    id: '1',
-    hasNewContent: true,
-    subjectInstance: {
-      id: '1',
-      teacherName: 'John Doe',
-      grade: '11',
-      section: 'A',
-      enrollment: 1,
-      icon: '/course1.jpg',
-      subject: {
-        id: '1',
-        name: 'Mathematics',
-        code: 'MATH101'
-      }
-    },
-    createdAt: new Date()
-  },
-  {
-    id: '2',
-    hasNewContent: false,
-    subjectInstance: {
-      id: '2',
-      teacherName: 'Jane Smith',
-      grade: '11',
-      section: 'A',
-      enrollment: 1,
-      icon: '/course2.jpg',
-      subject: {
-        id: '2',
-        name: 'Science',
-        code: 'SCI101'
-      }
-    },
-    createdAt: new Date()
-  }
-];
-
 export default function DashboardPage() {
   const router = useRouter();
-  const [enrolledSubjects] = useState<EnrolledSubject[]>(mockEnrolledSubjects);
-  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [enrolledSubjects, setEnrolledSubjects] = useState<EnrolledSubject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEnrolledSubjects = async () => {
+      try {
+        const response = await getEnrolledSubjects();
+        if (response.success && response.data) {
+          setEnrolledSubjects(response.data as EnrolledSubject[]);
+        } else {
+          toast.error(response.error || 'Failed to fetch enrolled subjects');
+        }
+      } catch (error) {
+        console.error('Error fetching enrolled subjects:', error);
+        toast.error('Failed to fetch enrolled subjects');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEnrolledSubjects();
+  }, []);
+
+  // Add useEffect to handle image URLs
+  useEffect(() => {
+    const updateImageUrls = async () => {
+      setIsImageLoading(true);
+      try {
+        const newUrls: Record<string, string> = {};
+        for (const enrollment of enrolledSubjects) {
+          if (enrollment.subjectInstance.icon && !imageUrls[enrollment.subjectInstance.icon]) {
+            try {
+              const url = await getImageUrl(enrollment.subjectInstance.icon);
+              if (url) {
+                newUrls[enrollment.subjectInstance.icon] = url;
+              }
+            } catch (error) {
+              console.error(`Failed to load image for ${enrollment.subjectInstance.subject.name}:`, error);
+            }
+          }
+        }
+        if (Object.keys(newUrls).length > 0) {
+          setImageUrls(prev => ({ ...prev, ...newUrls }));
+        }
+      } catch (error) {
+        console.error('Failed to update image URLs:', error);
+      } finally {
+        setIsImageLoading(false);
+      }
+    };
+
+    updateImageUrls();
+  }, [enrolledSubjects, imageUrls]);
 
   const handleSubjectClick = (enrollment: EnrolledSubject) => {
     router.push(`/student/dashboard/${enrollment.subjectInstance.id}`);
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#800000]"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 p-6">
+      <Toaster position="top-right" />
       {/* Enrolled Courses Section */}
       <section>
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
@@ -105,14 +131,14 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     <Image
-                      src={instance.icon}
+                      src={imageUrls[instance.icon] || '/assets/depositphotos_121012076-stock-illustration-blank-photo-icon.jpg'}
                       alt={instance.subject.name}
                       fill
                       className="object-cover"
                       unoptimized
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.src = '/course1.jpg';
+                        target.src = '/assets/depositphotos_121012076-stock-illustration-blank-photo-icon.jpg';
                       }}
                     />
                   )}

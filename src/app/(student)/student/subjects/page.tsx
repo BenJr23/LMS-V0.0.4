@@ -1,70 +1,79 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
-import { getAvailableSubjects } from '@/app/_actions/availableSubjects';
-import { getImageUrl } from '@/app/_actions/uploadIcon';
+import { useState, useEffect, useCallback } from 'react';
 import { Users } from 'lucide-react';
 import EnrolmentModal from './EnrolmentModal';
+import { getActiveSubjectInstances } from '@/app/_actions/availablesubjects';
+import { getImageUrl } from '@/app/_actions/uploadIcon';
+import { Toaster } from 'react-hot-toast';
 import { toast } from 'react-hot-toast';
 
 interface SubjectInstance {
   id: string;
+  subjectId: string;
+  userId: string;
   teacherName: string;
   grade: string;
   section: string;
   enrollment: number;
+  enrolmentCode: number;
   icon: string;
+  createdAt: Date;
+  updatedAt: Date;
   subject: {
     id: string;
     name: string;
     code: string;
+    createdById: string;
+    createdAt: Date;
+    updatedAt: Date;
   };
 }
 
 export default function SubjectsPage() {
-  const [availableSubjects, setAvailableSubjects] = useState<SubjectInstance[]>([]);
-  const [filteredSubjects, setFilteredSubjects] = useState<SubjectInstance[]>([]);
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [isImageLoading, setIsImageLoading] = useState(true);
-  const [selectedSubject, setSelectedSubject] = useState<SubjectInstance | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
   const [showGradeDropdown, setShowGradeDropdown] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [subjects, setSubjects] = useState<SubjectInstance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [selectedSubject, setSelectedSubject] = useState<SubjectInstance | null>(null);
 
   const gradeOptions = ['all', '7', '8', '9', '10'];
 
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async () => {
     try {
-      const result = await getAvailableSubjects();
-      if (result.success && result.data) {
-        setAvailableSubjects(result.data);
-        setFilteredSubjects(result.data);
+      setLoading(true);
+      const response = await getActiveSubjectInstances();
+      if (response.success && response.data) {
+        setSubjects(response.data as SubjectInstance[]);
       } else {
-        setError(result.error || 'Failed to fetch subjects');
+        toast.error(response.error || 'Failed to fetch subjects');
+        setSubjects([]);
       }
     } catch (error) {
-      console.error('Failed to fetch subject instances:', error);
-      setError('An error occurred while fetching subjects');
+      console.error('Error fetching subjects:', error);
+      toast.error('Failed to fetch subjects');
+      setSubjects([]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchSubjects();
-  }, []);
+  }, [fetchSubjects]);
 
-  // Update image URLs when instances change
+  // Add useEffect to handle image URLs
   useEffect(() => {
     const updateImageUrls = async () => {
       setIsImageLoading(true);
       try {
         const newUrls: Record<string, string> = {};
-        for (const instance of availableSubjects) {
+        for (const instance of subjects) {
           if (instance.icon && !imageUrls[instance.icon]) {
             try {
               const url = await getImageUrl(instance.icon);
@@ -87,56 +96,27 @@ export default function SubjectsPage() {
     };
 
     updateImageUrls();
-  }, [availableSubjects, imageUrls]);
+  }, [subjects, imageUrls]);
 
-  // Filter subjects
-  useEffect(() => {
-    let filtered = [...availableSubjects];
-
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(subject => 
-        subject.subject.name.toLowerCase().includes(query) ||
-        subject.subject.code.toLowerCase().includes(query) ||
-        subject.teacherName.toLowerCase().includes(query)
-      );
-    }
-
-    // Apply grade filter
-    if (selectedGrade !== 'all') {
-      filtered = filtered.filter(subject => subject.grade === selectedGrade);
-    }
-
-    setFilteredSubjects(filtered);
-  }, [availableSubjects, searchQuery, selectedGrade]);
-
-  const handleEnrollClick = (instance: SubjectInstance) => {
-    setSelectedSubject(instance);
-    setIsModalOpen(true);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#800000]"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-red-500 text-center">
-          <p className="text-xl font-semibold mb-2">Error</p>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
+  const filteredSubjects = subjects.filter((subject) => {
+    const matchesSearch = subject.subject.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         subject.subject.code.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesGrade = selectedGrade === 'all' || subject.grade === selectedGrade;
+    return matchesSearch && matchesGrade;
+  });
 
   return (
     <>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#800000',
+            color: '#fff',
+          },
+        }}
+      />
       <div className={`space-y-8 p-6 transition-all duration-300 ${isModalOpen ? 'blur-sm' : ''}`}>
         {/* Available Subjects Section */}
         <section>
@@ -183,14 +163,13 @@ export default function SubjectsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredSubjects.map((instance) => {
-              if (!instance || !instance.subject) return null;
-              
-              return (
-                <div
-                  key={instance.id}
-                  className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] transform cursor-pointer"
-                >
+            {loading ? (
+              <div className="col-span-full flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#800000]"></div>
+              </div>
+            ) : filteredSubjects.length > 0 ? (
+              filteredSubjects.map((subject) => (
+                <div key={subject.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-[1.02] transform cursor-pointer">
                   <div className="relative h-40 w-full">
                     {isImageLoading ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
@@ -198,14 +177,14 @@ export default function SubjectsPage() {
                       </div>
                     ) : (
                       <Image
-                        src={imageUrls[instance.icon] || '/course1.jpg'}
-                        alt={instance.subject.name || 'Subject'}
+                        src={imageUrls[subject.icon] || '/assets/depositphotos_121012076-stock-illustration-blank-photo-icon.jpg'}
+                        alt={subject.subject.name}
                         fill
                         className="object-cover"
                         unoptimized
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = '/course1.jpg';
+                          target.src = '/assets/depositphotos_121012076-stock-illustration-blank-photo-icon.jpg';
                         }}
                       />
                     )}
@@ -214,39 +193,41 @@ export default function SubjectsPage() {
                   <div className="p-4 space-y-2">
                     <div className="flex justify-between items-center text-sm mb-1">
                       <span className="bg-pink-100 text-[#800000] px-2 py-0.5 rounded font-medium">
-                        {instance.subject.code || 'No Code'}
+                        {subject.subject.code}
                       </span>
                       <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-medium">
-                        Section {instance.section || 'N/A'}
+                        Section {subject.section}
                       </span>
                     </div>
 
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {instance.subject.name || 'Unnamed Subject'}
+                      {subject.subject.name}
                     </h3>
-                    <p className="text-sm text-gray-600">Grade {instance.grade || 'N/A'}</p>
-                    <p className="text-sm text-gray-600">Teacher: {instance.teacherName || 'Unassigned'}</p>
+                    <p className="text-sm text-gray-600">Grade {subject.grade}</p>
+                    <p className="text-sm text-gray-600">Teacher: {subject.teacherName}</p>
 
-                    <div className="flex items-center text-sm">
+                    <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center text-gray-700 gap-1">
                         <Users className="w-4 h-4 text-[#800000]" />
-                        {instance.enrollment === 1 ? 'Active' : 'Inactive'}
+                        Active
                       </div>
                     </div>
 
                     <button
-                      onClick={() => handleEnrollClick(instance)}
+                      onClick={() => {
+                        setSelectedSubject(subject);
+                        setIsModalOpen(true);
+                      }}
                       className="block w-full text-center bg-[#800000] text-white py-2 rounded-md hover:bg-[#600000] transition-colors mt-2"
                     >
                       Enroll Now
                     </button>
                   </div>
                 </div>
-              );
-            })}
-            {filteredSubjects.length === 0 && (
+              ))
+            ) : (
               <div className="col-span-full text-center py-8 text-gray-500">
-                {searchQuery || selectedGrade !== 'all' ? 'No subjects found matching your criteria.' : 'No available subjects found.'}
+                No available subjects found.
               </div>
             )}
           </div>
@@ -254,7 +235,7 @@ export default function SubjectsPage() {
       </div>
 
       {/* Enrollment Modal */}
-      {selectedSubject && (
+      {isModalOpen && selectedSubject && (
         <EnrolmentModal
           isOpen={isModalOpen}
           onClose={() => {
@@ -264,10 +245,9 @@ export default function SubjectsPage() {
           subjectInstanceId={selectedSubject.id}
           subjectName={selectedSubject.subject.name}
           onSuccess={() => {
-            toast.success('Successfully enrolled in the subject!');
             setIsModalOpen(false);
             setSelectedSubject(null);
-            // Refetch subjects after successful enrollment
+            // Refresh the subjects list after successful enrollment
             fetchSubjects();
           }}
         />

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { createEnrolment } from '@/app/_actions/enrolment';
+import { enrollInSubject } from '@/app/_actions/enrolment';
+import toast from 'react-hot-toast';
 
 interface EnrolmentModalProps {
   isOpen: boolean;
@@ -23,7 +23,6 @@ export default function EnrolmentModal({
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
 
   if (!isOpen) return null;
 
@@ -32,29 +31,21 @@ export default function EnrolmentModal({
     setError('');
     setIsLoading(true);
 
-    // Validate enrollment code
-    const enrollmentCode = parseInt(code);
-    if (isNaN(enrollmentCode) || enrollmentCode <= 0) {
-      setError('Please enter a valid enrollment code');
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const result = await createEnrolment(subjectInstanceId, enrollmentCode);
+      const result = await enrollInSubject(subjectInstanceId, parseInt(code));
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to enroll');
+      if (result.success) {
+        toast.success('Successfully enrolled in subject!');
+        onSuccess?.();
+        onClose();
+      } else {
+        setError(result.error || 'Failed to enroll in subject');
+        toast.error(result.error || 'Failed to enroll in subject');
       }
-
-      // Call onSuccess callback if provided
-      onSuccess?.();
-      
-      // Close modal and refresh the page
-      onClose();
-      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to enroll');
+      console.error('Enrollment error:', err);
+      setError('An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

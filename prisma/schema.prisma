@@ -61,7 +61,7 @@ model Enrolment {
   id                String          @id @default(cuid())
   subjectInstanceId String
   studentId         String          //clerk ID
-  email             String          @unique
+  email             String          
   code              Int
   hasNewContent     Boolean         @default(false)
   createdAt         DateTime        @default(now())
