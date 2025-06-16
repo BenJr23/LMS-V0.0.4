@@ -157,6 +157,35 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [requirementType, setRequirementType] = useState<string>('');
+
+  useEffect(() => {
+    const fetchRequirementType = async () => {
+      try {
+        const response = await getStudentRequirementDetail(requirementId);
+        if (response.success && response.data) {
+          setRequirementType(response.data.type);
+        }
+      } catch (error) {
+        console.error('Error fetching requirement type:', error);
+      }
+    };
+    if (isOpen) {
+      fetchRequirementType();
+    }
+  }, [requirementId, isOpen]);
+
+  const resetForm = () => {
+    setTitle('');
+    setContent('');
+    setFile(null);
+    setUploadProgress(0);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,7 +199,7 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
       setUploadProgress(0);
       
       let filePath = '';
-      if (file) {
+      if (file && requirementType !== 'FORUM' && requirementType !== 'QUIZ') {
         const uploadResponse = await uploadRequirementFile(file);
         if (!uploadResponse.success || !uploadResponse.path) {
           throw new Error(uploadResponse.error || 'Failed to upload file');
@@ -188,6 +217,7 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
 
       if (response.success) {
         toast.success('Submission created successfully');
+        resetForm();
         onSuccess();
         onClose();
       } else {
@@ -205,12 +235,16 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">Create Submission</h2>
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {requirementType === 'FORUM' ? 'Create Forum Post' : 
+             requirementType === 'QUIZ' ? 'Take Quiz' : 
+             'Create Submission'}
+          </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700 transition-colors"
           >
             <X className="w-6 h-6" />
@@ -220,38 +254,48 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-              Title
+              {requirementType === 'FORUM' ? 'Post Title' : 
+               requirementType === 'QUIZ' ? 'Quiz Title' : 
+               'Submission Title'}
             </label>
             <input
               type="text"
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#800000] focus:border-transparent"
-              placeholder="Enter submission title"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-900 placeholder-gray-500"
+              placeholder={requirementType === 'FORUM' ? 'Enter post title' : 
+                         requirementType === 'QUIZ' ? 'Enter quiz title' : 
+                         'Enter submission title'}
               required
             />
           </div>
 
           <div>
             <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-              Content
+              {requirementType === 'FORUM' ? 'Post Content' : 
+               requirementType === 'QUIZ' ? 'Quiz Answers' : 
+               'Content'}
             </label>
             <div className="border border-gray-300 rounded-lg">
               <RichTextEditor
-                initialValue={content}
+                content={content}
                 onChange={setContent}
-                placeholder="Enter your submission content..."
+                placeholder={requirementType === 'FORUM' ? 'Write your post content...' : 
+                           requirementType === 'QUIZ' ? 'Enter your quiz answers...' : 
+                           'Enter your submission content...'}
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Attach File (Optional)
-            </label>
-            <FileUploadBox onFileSelect={setFile} />
-          </div>
+          {requirementType !== 'FORUM' && requirementType !== 'QUIZ' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Attach File (Optional)
+              </label>
+              <FileUploadBox onFileSelect={setFile} />
+            </div>
+          )}
 
           {uploadProgress > 0 && (
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -262,10 +306,10 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
             </div>
           )}
 
-          <div className="flex justify-end space-x-4 pt-4">
+          <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               disabled={isSubmitting}
             >
@@ -279,9 +323,13 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Creating...
+                  {requirementType === 'FORUM' ? 'Posting...' : 
+                   requirementType === 'QUIZ' ? 'Submitting...' : 
+                   'Creating...'}
                 </>
               ) : (
+                requirementType === 'FORUM' ? 'Create Post' : 
+                requirementType === 'QUIZ' ? 'Submit Quiz' : 
                 'Create Submission'
               )}
             </button>
@@ -536,9 +584,6 @@ export default function RequirementDetailPage({
       ) : (
         <div className="bg-white rounded-xl shadow-lg p-8 border border-pink-100">
           <div className="text-center py-12">
-            <Upload className="w-16 h-16 text-gray-400 mx-auto mb-6" />
-            <h3 className="text-2xl font-semibold text-gray-900 mb-3">No Submission Yet</h3>
-            <p className="text-gray-600 text-lg mb-6">You haven&apos;t submitted your work for this requirement.</p>
             <button
               onClick={() => setIsSubmissionModalOpen(true)}
               className="px-6 py-3 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-lg font-medium"

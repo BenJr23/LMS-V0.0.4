@@ -144,10 +144,10 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   ];
 
   const REQUIREMENT_TYPES = [
-    { key: 'FORUM', label: 'FORUM', icon: <MessageSquare className="w-5 h-5" /> },
-    { key: 'QUIZ', label: 'QUIZ', icon: <HelpCircle className="w-5 h-5" /> },
-    { key: 'ASSIGNMENT', label: 'ASSIGNMENT', icon: <FileText className="w-5 h-5" /> },
-    { key: 'ACTIVITY', label: 'ACTIVITY', icon: <Users className="w-5 h-5" /> }
+    { key: 'FORUM', label: 'FORUMS', icon: <MessageSquare className="w-5 h-5" /> },
+    { key: 'QUIZ', label: 'QUIZZES', icon: <HelpCircle className="w-5 h-5" /> },
+    { key: 'ASSIGNMENT', label: 'ASSIGNMENTS', icon: <FileText className="w-5 h-5" /> },
+    { key: 'ACTIVITY', label: 'ACTIVITIES', icon: <Users className="w-5 h-5" /> }
   ];
 
   const handleDelete = async () => {
@@ -188,36 +188,57 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
         return;
       }
 
+      const requirementType = selectedRequirementType.replace('S', '') as 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
+      
       const result = await createRequirement({
         subjectInstanceId: resolvedParams.id,
         title: assignmentForm.title,
         content: assignmentForm.content,
         scoreBase: parseInt(assignmentForm.baseScore),
         deadline: new Date(assignmentForm.deadline),
-        type: selectedRequirementType as 'FORUMS' | 'QUIZZES' | 'ASSIGNMENTS' | 'ACTIVITIES'
+        type: requirementType
       });
 
       if (result.success) {
-        toast.success(`${assignmentForm.type} created successfully`);
+        toast.success(`${requirementType} created successfully!`);
         setIsAddAssignmentModalOpen(false);
-        // Refresh both subject instance and requirements data
-        const [updatedSubject, updatedRequirements] = await Promise.all([
-          getSubjectInstance(resolvedParams.id),
-          getRequirements(resolvedParams.id)
-        ]);
-        setSubjectInstance(updatedSubject);
+        // Reset form
+        setAssignmentForm({
+          title: '',
+          content: '',
+          deadline: '',
+          baseScore: '',
+          type: 'Assignment'
+        });
+        // Refresh requirements data
+        const updatedRequirements = await getRequirements(resolvedParams.id);
         if (updatedRequirements.success && updatedRequirements.data) {
           setRequirements(updatedRequirements.data);
-        } else {
-          setRequirements([]);
         }
       } else {
-        toast.error(result.error || `Failed to create ${assignmentForm.type.toLowerCase()}`);
+        toast.error(result.error || `Failed to create ${requirementType.toLowerCase()}`);
       }
     } catch (error) {
       console.error('Error creating requirement:', error);
       toast.error(`Failed to create ${assignmentForm.type.toLowerCase()}`);
     }
+  };
+
+  const getRequirementLabels = (type: string) => {
+    const baseType = type.replace('S', '');
+    const formattedType = baseType.charAt(0) + baseType.slice(1).toLowerCase();
+    return {
+      title: `Create new ${formattedType}`,
+      titleField: `${formattedType} title`,
+      contentField: `${formattedType} instructions`,
+      deadlineField: `${formattedType} deadline`,
+      pointsField: `${formattedType} points`,
+      submitButton: `Create ${formattedType}`,
+      description: `Create a new ${formattedType.toLowerCase()} for your students to complete.`,
+      titlePlaceholder: `Enter ${formattedType.toLowerCase()} title...`,
+      contentPlaceholder: `Enter ${formattedType.toLowerCase()} instructions...`,
+      pointsPlaceholder: `Enter ${formattedType.toLowerCase()} points...`
+    };
   };
 
   if (isLoading) {
@@ -392,86 +413,69 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl my-8">
             {/* Modal Header */}
-            <div className="border-b border-gray-200 px-6 py-4 sticky top-0 bg-white z-10">
-              <h3 className="text-xl font-semibold text-[#800000]">Create New {assignmentForm.type}</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {selectedRequirementType === 'FORUMS' ? 'Create a new discussion forum for students to engage in topic-related conversations.' :
-                 selectedRequirementType === 'QUIZZES' ? 'Create a new quiz to assess student understanding of the course material.' :
-                 selectedRequirementType === 'ACTIVITIES' ? 'Create a new activity to encourage student participation and learning.' :
-                 'Create a new assignment for students to complete and submit.'}
+            <div className="border-b border-gray-200 px-8 py-6 sticky top-0 bg-white z-10">
+              <h3 className="text-2xl font-bold text-gray-900">
+                {getRequirementLabels(selectedRequirementType).title}
+              </h3>
+              <p className="text-sm text-gray-600 mt-2">
+                {getRequirementLabels(selectedRequirementType).description}
               </p>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[calc(100vh-16rem)] overflow-y-auto">
+            <div className="p-8 space-y-8 max-h-[calc(100vh-16rem)] overflow-y-auto">
               {/* Title Section */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-700">
-                  {selectedRequirementType === 'FORUMS' ? 'Discussion Topic' :
-                   selectedRequirementType === 'QUIZZES' ? 'Quiz Title' :
-                   selectedRequirementType === 'ACTIVITIES' ? 'Activity Title' :
-                   'Assignment Title'}
+                  {getRequirementLabels(selectedRequirementType).titleField}
                 </label>
                 <input
                   type="text"
                   value={assignmentForm.title}
                   onChange={(e) => setAssignmentForm(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200"
-                  placeholder={`Enter ${assignmentForm.type.toLowerCase()} title`}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200 placeholder-gray-400"
+                  placeholder={getRequirementLabels(selectedRequirementType).titlePlaceholder}
                 />
               </div>
 
               {/* Content Section */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-700">
-                  {selectedRequirementType === 'FORUMS' ? 'Discussion Guidelines' :
-                   selectedRequirementType === 'QUIZZES' ? 'Quiz Instructions' :
-                   selectedRequirementType === 'ACTIVITIES' ? 'Activity Description' :
-                   'Assignment Instructions'}
+                  {getRequirementLabels(selectedRequirementType).contentField}
                 </label>
-                <p className="text-sm text-gray-500 mb-2">
-                  {selectedRequirementType === 'FORUMS' ? 'Provide guidelines and topics for discussion. Students will be able to post their responses and engage with others.' :
-                   selectedRequirementType === 'QUIZZES' ? 'Provide clear instructions and any specific requirements for the quiz.' :
-                   selectedRequirementType === 'ACTIVITIES' ? 'Describe the activity, its objectives, and what students need to do to complete it.' :
-                   'Provide detailed instructions and requirements for the assignment.'}
-                </p>
-                <RichTextEditor
-                  content={assignmentForm.content}
-                  onChange={(content) => setAssignmentForm(prev => ({ ...prev, content }))}
-                  placeholder={`Enter ${assignmentForm.type.toLowerCase()} instructions here...`}
-                  className="min-h-[300px]"
-                />
+                <div className="border border-gray-300 rounded-lg overflow-hidden">
+                  <RichTextEditor
+                    content={assignmentForm.content}
+                    onChange={(content) => setAssignmentForm(prev => ({ ...prev, content }))}
+                    placeholder={getRequirementLabels(selectedRequirementType).contentPlaceholder}
+                    className="min-h-[300px]"
+                  />
+                </div>
               </div>
 
               {/* Deadline and Score Section */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-3">
                   <label className="block text-sm font-medium text-gray-700">
-                    {selectedRequirementType === 'FORUMS' ? 'Discussion End Date' :
-                     selectedRequirementType === 'QUIZZES' ? 'Quiz Deadline' :
-                     selectedRequirementType === 'ACTIVITIES' ? 'Activity Deadline' :
-                     'Submission Deadline'}
+                    {getRequirementLabels(selectedRequirementType).deadlineField}
                   </label>
                   <input
                     type="datetime-local"
                     value={assignmentForm.deadline}
                     onChange={(e) => setAssignmentForm(prev => ({ ...prev, deadline: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200"
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="block text-sm font-medium text-gray-700">
-                    {selectedRequirementType === 'FORUMS' ? 'Participation Points' :
-                     selectedRequirementType === 'QUIZZES' ? 'Quiz Points' :
-                     selectedRequirementType === 'ACTIVITIES' ? 'Activity Points' :
-                     'Maximum Points'}
+                    {getRequirementLabels(selectedRequirementType).pointsField}
                   </label>
                   <input
                     type="number"
                     value={assignmentForm.baseScore}
                     onChange={(e) => setAssignmentForm(prev => ({ ...prev, baseScore: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200"
-                    placeholder={`Enter ${assignmentForm.type.toLowerCase()} points`}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#800000] focus:border-transparent text-gray-800 transition-all duration-200 placeholder-gray-400"
+                    placeholder={getRequirementLabels(selectedRequirementType).pointsPlaceholder}
                     min="0"
                     step="1"
                   />
@@ -480,22 +484,19 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
             </div>
 
             {/* Modal Footer */}
-            <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 rounded-b-xl sticky bottom-0">
-              <div className="flex justify-end gap-3">
+            <div className="border-t border-gray-200 px-8 py-6 bg-gray-50 rounded-b-xl sticky bottom-0">
+              <div className="flex justify-end gap-4">
                 <button
                   onClick={() => setIsAddAssignmentModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-200 font-medium"
+                  className="px-6 py-3 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-200 font-medium text-base"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateRequirement}
-                  className="px-4 py-2 rounded-lg bg-[#800000] text-white hover:bg-[#600000] transition-colors duration-200 font-medium shadow-sm"
+                  className="px-6 py-3 rounded-lg bg-[#800000] text-white hover:bg-[#600000] transition-colors duration-200 font-medium text-base shadow-sm"
                 >
-                  {selectedRequirementType === 'FORUMS' ? 'Create Discussion' :
-                   selectedRequirementType === 'QUIZZES' ? 'Create Quiz' :
-                   selectedRequirementType === 'ACTIVITIES' ? 'Create Activity' :
-                   'Create Assignment'}
+                  {getRequirementLabels(selectedRequirementType).submitButton}
                 </button>
               </div>
             </div>
