@@ -11,7 +11,7 @@ type CreateRequirementInput = {
   content: string;
   scoreBase: number;
   deadline: Date;
-  type: 'FORUMS' | 'QUIZZES' | 'ASSIGNMENTS' | 'ACTIVITIES';
+  type: 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
 };
 
 export async function createRequirement(data: CreateRequirementInput) {

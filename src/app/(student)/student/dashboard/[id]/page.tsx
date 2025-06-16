@@ -49,7 +49,6 @@ interface Submission {
   title: string;
   content: string;
   filePath: string;
-  status: number;
   graded: boolean;
   score: number | null;
   feedback: string | null;
@@ -82,10 +81,10 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
   const [imageUrl, setImageUrl] = useState<string>('');
 
   const REQUIREMENT_TYPES = [
-    { key: 'FORUMS', label: 'FORUMS', icon: <MessageSquare className="w-5 h-5" /> },
-    { key: 'QUIZZES', label: 'QUIZZES', icon: <HelpCircle className="w-5 h-5" /> },
-    { key: 'ASSIGNMENTS', label: 'ASSIGNMENTS', icon: <FileText className="w-5 h-5" /> },
-    { key: 'ACTIVITIES', label: 'ACTIVITIES', icon: <Users className="w-5 h-5" /> }
+    { key: 'FORUM', label: 'FORUM', icon: <MessageSquare className="w-5 h-5" /> },
+    { key: 'QUIZ', label: 'QUIZ', icon: <HelpCircle className="w-5 h-5" /> },
+    { key: 'ASSIGNMENT', label: 'ASSIGNMENT', icon: <FileText className="w-5 h-5" /> },
+    { key: 'ACTIVITY', label: 'ACTIVITY', icon: <Users className="w-5 h-5" /> }
   ];
 
   useEffect(() => {
@@ -147,16 +146,9 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
       };
     }
 
-    if (requirement.submission.status === 1) {
-      return {
-        text: 'Submitted',
-        color: 'bg-blue-100 text-blue-800'
-      };
-    }
-
     return {
-      text: 'Draft',
-      color: 'bg-yellow-100 text-yellow-800'
+      text: 'Submitted',
+      color: 'bg-blue-100 text-blue-800'
     };
   };
 
@@ -337,8 +329,6 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
                           ) : (
                             typeRequirements.map((requirement) => {
                               const status = getRequirementStatus(requirement);
-                              const isOverdue = new Date(requirement.deadline) < new Date() && !requirement.submission;
-
                               return (
                                 <tr key={requirement.id} className="hover:bg-pink-50/50">
                                   <td className="p-4 text-gray-700">

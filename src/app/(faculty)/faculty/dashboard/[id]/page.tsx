@@ -144,10 +144,10 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   ];
 
   const REQUIREMENT_TYPES = [
-    { key: 'FORUMS', label: 'FORUMS', icon: <MessageSquare className="w-5 h-5" /> },
-    { key: 'QUIZZES', label: 'QUIZZES', icon: <HelpCircle className="w-5 h-5" /> },
-    { key: 'ASSIGNMENTS', label: 'ASSIGNMENTS', icon: <FileText className="w-5 h-5" /> },
-    { key: 'ACTIVITIES', label: 'ACTIVITIES', icon: <Users className="w-5 h-5" /> }
+    { key: 'FORUM', label: 'FORUM', icon: <MessageSquare className="w-5 h-5" /> },
+    { key: 'QUIZ', label: 'QUIZ', icon: <HelpCircle className="w-5 h-5" /> },
+    { key: 'ASSIGNMENT', label: 'ASSIGNMENT', icon: <FileText className="w-5 h-5" /> },
+    { key: 'ACTIVITY', label: 'ACTIVITY', icon: <Users className="w-5 h-5" /> }
   ];
 
   const handleDelete = async () => {
