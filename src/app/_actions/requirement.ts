@@ -119,3 +119,81 @@ export async function getRequirements(subjectInstanceId: string) {
     };
   }
 }
+
+export async function getStudentRequirements(subjectInstanceId: string) {
+  try {
+    const user = await currentUser();
+
+    if (!user || !user.id) {
+      throw new Error('User not authenticated.');
+    }
+
+    // Get the student's enrollment for this subject instance
+    const enrollment = await prisma.enrolment.findFirst({
+      where: {
+        subjectInstanceId: subjectInstanceId,
+        studentId: user.id
+      }
+    });
+
+    if (!enrollment) {
+      throw new Error('You are not enrolled in this subject.');
+    }
+
+    // Get all requirements with submissions for this subject instance
+    const requirements = await prisma.requirement.findMany({
+      where: {
+        subjectInstanceId: subjectInstanceId
+      },
+      include: {
+        submissions: {
+          where: {
+            enrollmentId: enrollment.id
+          },
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            filePath: true,
+            graded: true,
+            score: true,
+            feedback: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        }
+      },
+      orderBy: [
+        { type: 'asc' },
+        { requirementNumber: 'asc' }
+      ]
+    });
+
+    // Transform the data to include submission status
+    const requirementsWithStatus = requirements.map(req => {
+      const submission = req.submissions[0]; // Get the first submission if exists
+      let submissionStatus: 'GRADED' | 'SUBMITTED' | 'NOT_SUBMITTED' = 'NOT_SUBMITTED';
+      
+      if (submission) {
+        submissionStatus = submission.graded ? 'GRADED' : 'SUBMITTED';
+      }
+
+      return {
+        ...req,
+        submissionStatus,
+        submission: submission || null
+      };
+    });
+
+    return {
+      success: true,
+      data: requirementsWithStatus
+    };
+  } catch (error) {
+    console.error('Error fetching student requirements:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch requirements'
+    };
+  }
+}

@@ -218,3 +218,59 @@ export async function deleteSubjectInstance(id: string) {
     };
   }
 }
+
+export async function getStudentSubjectInstance(id: string) {
+  try {
+    const user = await currentUser();
+
+    if (!user || !user.id) {
+      throw new Error('User not authenticated.');
+    }
+
+    // First get the student's enrolment for this subject instance
+    const enrolment = await prisma.enrolment.findFirst({
+      where: {
+        subjectInstanceId: id,
+        studentId: user.id
+      }
+    });
+
+    if (!enrolment) {
+      throw new Error('You are not enrolled in this subject.');
+    }
+
+    // Then fetch the subject instance with all related data
+    const subjectInstance = await prisma.subjectInstance.findUnique({
+      where: {
+        id: id
+      },
+      include: {
+        subject: true,
+        announcements: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
+        moduleFolders: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
+        uploadedContents: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!subjectInstance) {
+      throw new Error('Subject instance not found.');
+    }
+
+    return subjectInstance;
+  } catch (error) {
+    console.error('Error fetching student subject instance:', error);
+    throw error;
+  }
+}
