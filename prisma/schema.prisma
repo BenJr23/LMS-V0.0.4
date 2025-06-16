@@ -118,6 +118,7 @@ model Submission {
   title         String
   content       String
   filePath      String
+  status        Int         @default(0) // 0 = draft, 1 = complete
   graded        Boolean     @default(false)
   score         Float?
   feedback      String?

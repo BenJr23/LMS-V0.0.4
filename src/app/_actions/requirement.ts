@@ -197,3 +197,68 @@ export async function getStudentRequirements(subjectInstanceId: string) {
     };
   }
 }
+
+export async function getStudentRequirementDetail(requirementId: string) {
+  try {
+    const user = await currentUser();
+
+    if (!user || !user.id) {
+      throw new Error('User not authenticated.');
+    }
+
+    // Get the requirement with its subject instance
+    const requirement = await prisma.requirement.findUnique({
+      where: {
+        id: requirementId
+      },
+      include: {
+        subjectInstance: {
+          include: {
+            subject: true
+          }
+        }
+      }
+    });
+
+    if (!requirement) {
+      throw new Error('Requirement not found.');
+    }
+
+    // Get the student's enrollment for this subject instance
+    const enrollment = await prisma.enrolment.findFirst({
+      where: {
+        subjectInstanceId: requirement.subjectInstanceId,
+        studentId: user.id
+      }
+    });
+
+    if (!enrollment) {
+      throw new Error('You are not enrolled in this subject.');
+    }
+
+    // Get the submission for this requirement
+    const submission = await prisma.submission.findFirst({
+      where: {
+        requirementId: requirementId,
+        enrollmentId: enrollment.id
+      }
+    });
+
+    return {
+      success: true,
+      data: {
+        ...requirement,
+        submission: submission || null,
+        submissionStatus: submission 
+          ? (submission.graded ? 'GRADED' : 'SUBMITTED')
+          : 'NOT_SUBMITTED'
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching requirement detail:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch requirement detail'
+    };
+  }
+}

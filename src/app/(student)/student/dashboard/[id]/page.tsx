@@ -7,6 +7,7 @@ import { getStudentRequirements } from '@/app/_actions/requirement';
 import { getImageUrl } from '@/app/_actions/uploadIcon';
 import toast from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 interface SubjectInstance {
   id: string;
@@ -48,6 +49,7 @@ interface Submission {
   title: string;
   content: string;
   filePath: string;
+  status: number;
   graded: boolean;
   score: number | null;
   feedback: string | null;
@@ -71,6 +73,7 @@ interface Requirement {
 }
 
 export default function SubjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const resolvedParams = use(params);
   const [activeTab, setActiveTab] = useState('announcements');
   const [subjectInstance, setSubjectInstance] = useState<SubjectInstance | null>(null);
@@ -123,6 +126,39 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
     { id: 'files', label: 'Files', icon: <FileText className="w-4 h-4 mr-1" /> },
     { id: 'requirements', label: 'Requirements', icon: <ClipboardList className="w-4 h-4 mr-1" /> },
   ];
+
+  const handleViewRequirement = (requirementId: string) => {
+    router.push(`/student/dashboard/${resolvedParams.id}/requirements/${requirementId}`);
+  };
+
+  const getRequirementStatus = (requirement: Requirement) => {
+    if (!requirement.submission) {
+      const isOverdue = new Date(requirement.deadline) < new Date();
+      return {
+        text: isOverdue ? 'Overdue' : 'Not Submitted',
+        color: isOverdue ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+      };
+    }
+
+    if (requirement.submission.graded) {
+      return {
+        text: `Graded (${requirement.submission.score}/${requirement.scoreBase})`,
+        color: 'bg-green-100 text-green-800'
+      };
+    }
+
+    if (requirement.submission.status === 1) {
+      return {
+        text: 'Submitted',
+        color: 'bg-blue-100 text-blue-800'
+      };
+    }
+
+    return {
+      text: 'Draft',
+      color: 'bg-yellow-100 text-yellow-800'
+    };
+  };
 
   if (loading) {
     return (
@@ -284,29 +320,24 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
                         <thead>
                           <tr className="bg-pink-50 border-b border-pink-100">
                             <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Requirement</th>
-                            <th className="p-4 text-left font-semibold text-[#800000] w-[30%]">Title</th>
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[25%]">Title</th>
                             <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Due Date</th>
                             <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Points</th>
-                            <th className="p-4 text-left font-semibold text-[#800000] w-[20%]">Status</th>
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[15%]">Status</th>
+                            <th className="p-4 text-left font-semibold text-[#800000] w-[10%]">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-pink-50">
                           {typeRequirements.length === 0 ? (
                             <tr>
-                              <td colSpan={5} className="p-4 text-center text-gray-500 italic">
+                              <td colSpan={6} className="p-4 text-center text-gray-500 italic">
                                 No {label.toLowerCase()} available yet.
                               </td>
                             </tr>
                           ) : (
                             typeRequirements.map((requirement) => {
-                              const isOverdue = new Date(requirement.deadline) < new Date() && requirement.submissionStatus === 'NOT_SUBMITTED';
-                              const statusColor = requirement.submissionStatus === 'GRADED' 
-                                ? 'bg-green-100 text-green-800'
-                                : requirement.submissionStatus === 'SUBMITTED'
-                                ? 'bg-blue-100 text-blue-800'
-                                : isOverdue
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800';
+                              const status = getRequirementStatus(requirement);
+                              const isOverdue = new Date(requirement.deadline) < new Date() && !requirement.submission;
 
                               return (
                                 <tr key={requirement.id} className="hover:bg-pink-50/50">
@@ -323,15 +354,17 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
                                     {requirement.scoreBase} points
                                   </td>
                                   <td className="p-4">
-                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColor}`}>
-                                      {requirement.submissionStatus === 'GRADED' 
-                                        ? `Graded (${requirement.submission?.score}/${requirement.scoreBase})`
-                                        : requirement.submissionStatus === 'SUBMITTED'
-                                        ? 'Submitted'
-                                        : isOverdue
-                                        ? 'Overdue'
-                                        : 'Not Submitted'}
+                                    <span className={`px-3 py-1.5 text-xs font-semibold rounded-full ${status.color}`}>
+                                      {status.text}
                                     </span>
+                                  </td>
+                                  <td className="p-4">
+                                    <button
+                                      onClick={() => handleViewRequirement(requirement.id)}
+                                      className="px-3 py-1.5 text-sm font-medium text-[#800000] bg-pink-50 hover:bg-pink-100 rounded-md transition-colors duration-150"
+                                    >
+                                      {requirement.submission ? 'View' : 'Start'}
+                                    </button>
                                   </td>
                                 </tr>
                               );
