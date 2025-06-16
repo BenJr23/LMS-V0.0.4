@@ -3,6 +3,7 @@
 import { currentUser } from '@clerk/nextjs/server';
 import { PrismaClient } from '../../generated/prisma';
 import { revalidatePath } from 'next/cache';
+import { createClient } from '@supabase/supabase-js';
 
 const prisma = new PrismaClient();
 
@@ -14,7 +15,8 @@ interface CreateSubmissionData {
 }
 
 interface UpdateSubmissionStatusData {
-  submissionId: string;
+  id: string;
+  studentId: string;
   status: number;
 }
 
@@ -92,50 +94,86 @@ export async function createSubmission(data: CreateSubmissionData) {
   }
 }
 
+// Basic text similarity check function
+async function checkTextSimilarity(text: string): Promise<{ success: boolean; score?: number; error?: string }> {
+  try {
+    // This is a placeholder for a more sophisticated similarity check
+    // In a real implementation, you might want to:
+    // 1. Compare against a database of known sources
+    // 2. Use NLP techniques to detect paraphrasing
+    // 3. Implement fuzzy matching algorithms
+    
+    // For now, we'll return a mock score
+    const mockScore = Math.random() * 10; // Random score between 0-10%
+    
+    return {
+      success: true,
+      score: mockScore
+    };
+  } catch (error) {
+    console.error('Similarity check error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check similarity'
+    };
+  }
+}
+
 export async function updateSubmissionStatus(data: UpdateSubmissionStatusData) {
   try {
-    const user = await currentUser();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
-    if (!user || !user.id) {
-      throw new Error('User not authenticated.');
+    // Get the current submission
+    const { data: submission, error: fetchError } = await supabase
+      .from('submissions')
+      .select('*')
+      .eq('id', data.id)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
     }
-
-    // Get the submission
-    const submission = await prisma.submission.findUnique({
-      where: { id: data.submissionId },
-      include: {
-        requirement: {
-          include: {
-            subjectInstance: true
-          }
-        }
-      }
-    });
 
     if (!submission) {
       throw new Error('Submission not found');
     }
 
-    // Verify ownership
-    if (submission.userId !== user.id) {
+    // Check if user is authorized to update this submission
+    if (submission.studentId !== data.studentId) {
       throw new Error('Unauthorized');
     }
 
+    // If completing submission, check for similarity
+    if (data.status === 1 && submission.filePath) {
+      // For now, we'll just log that we're skipping the similarity check
+      console.log('Skipping similarity check - using mock implementation');
+      
+      // In a real implementation, you would:
+      // 1. Read the file content
+      // 2. Perform similarity analysis
+      // 3. Return appropriate results
+      
+      // Example of how we would use the similarity check:
+      // const similarityCheck = await checkTextSimilarity(fileContent);
+      // if (!similarityCheck.success || (similarityCheck.score && similarityCheck.score > 20)) {
+      //   throw new Error('Similarity check failed or score too high');
+      // }
+    }
+
     // Update the status
-    const updatedSubmission = await prisma.submission.update({
-      where: { id: data.submissionId },
-      data: {
-        status: data.status
-      }
-    });
+    const { error: updateError } = await supabase
+      .from('submissions')
+      .update({ status: data.status })
+      .eq('id', data.id);
 
-    revalidatePath(`/student/dashboard/${submission.requirement.subjectInstanceId}/requirements/${submission.requirementId}`);
-    revalidatePath(`/student/dashboard/${submission.requirement.subjectInstanceId}`);
+    if (updateError) {
+      throw updateError;
+    }
 
-    return {
-      success: true,
-      data: updatedSubmission
-    };
+    return { success: true };
   } catch (error) {
     console.error('Error updating submission status:', error);
     return {

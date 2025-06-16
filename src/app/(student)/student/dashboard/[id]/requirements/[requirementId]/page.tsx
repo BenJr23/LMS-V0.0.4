@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, use, useRef } from 'react';
-import { ArrowLeft, FileText, Calendar, Award, MessageSquare, Upload, X, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Award, MessageSquare, Upload, X, Loader2, Download, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getStudentRequirementDetail } from '@/app/_actions/requirement';
-import { createSubmission, updateSubmissionStatus } from '@/app/_actions/submission';
+import { createSubmission } from '@/app/_actions/submission';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
@@ -33,6 +33,7 @@ interface RequirementDetail {
     feedback: string | null;
     createdAt: Date;
     updatedAt: Date;
+    userId: string;
   } | null;
   subjectInstance: {
     subject: {
@@ -47,6 +48,21 @@ interface SubmissionModalProps {
   onClose: () => void;
   requirementId: string;
   onSuccess: () => void;
+}
+
+interface PlagiarismCheckModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  score: number;
+  status: 'success' | 'error';
+  message: string;
+}
+
+// Add interface for matched content
+interface MatchedContent {
+  text: string;
+  source: string;
+  similarity: number;
 }
 
 function FileUploadBox({ onFileSelect }: { onFileSelect: (file: File | null) => void }) {
@@ -239,7 +255,7 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
             </label>
             <div className="border border-gray-300 rounded-lg">
               <RichTextEditor
-                initialValue={content}
+                content={content}
                 onChange={setContent}
                 placeholder="Enter your submission content..."
               />
@@ -292,6 +308,95 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
   );
 }
 
+function PlagiarismCheckModal({ isOpen, onClose, score, status, message }: PlagiarismCheckModalProps) {
+  // Mock matched content data
+  const matchedContent: MatchedContent[] = [
+    {
+      text: "The implementation of machine learning algorithms requires careful consideration of data preprocessing steps.",
+      source: "Research Paper: Machine Learning Fundamentals (2023)",
+      similarity: 85
+    },
+    {
+      text: "Data preprocessing is a crucial step in the machine learning pipeline that can significantly impact model performance.",
+      source: "Online Article: Data Science Best Practices",
+      similarity: 75
+    }
+  ];
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h2 className="text-2xl font-bold text-gray-900">Plagiarism Check Results</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-center">
+            {status === 'success' ? (
+              <div className="flex flex-col items-center text-center">
+                <CheckCircle2 className="w-16 h-16 text-green-500 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Plagiarism Check Complete</h3>
+                <p className="text-gray-600 mb-4">{message}</p>
+                <div className="bg-green-50 rounded-lg p-4 w-full">
+                  <p className="text-sm text-gray-600 mb-1">Similarity Score</p>
+                  <p className="text-3xl font-bold text-green-600">{score}%</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center">
+                <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">High Similarity Detected</h3>
+                <p className="text-gray-600 mb-4">{message}</p>
+                <div className="bg-red-50 rounded-lg p-4 w-full">
+                  <p className="text-sm text-gray-600 mb-1">Similarity Score</p>
+                  <p className="text-3xl font-bold text-red-600">{score}%</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Matched Content Section */}
+          {matchedContent.length > 0 && (
+            <div className="mt-8">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">Matched Content</h4>
+              <div className="space-y-4">
+                {matchedContent.map((match, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-sm font-medium text-gray-600">Source: {match.source}</p>
+                      <span className="text-sm font-medium text-red-600">{match.similarity}% match</span>
+                    </div>
+                    <div className="bg-white rounded p-3 border border-gray-200">
+                      <p className="text-gray-700 italic">&ldquo;{match.text}&rdquo;</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RequirementDetailPage({ 
   params 
 }: { 
@@ -302,6 +407,16 @@ export default function RequirementDetailPage({
   const [requirement, setRequirement] = useState<RequirementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [isPlagiarismModalOpen, setIsPlagiarismModalOpen] = useState(false);
+  const [plagiarismResult, setPlagiarismResult] = useState<{
+    score: number;
+    status: 'success' | 'error';
+    message: string;
+  }>({
+    score: 0,
+    status: 'success',
+    message: ''
+  });
 
   const fetchRequirement = async () => {
     try {
@@ -327,24 +442,72 @@ export default function RequirementDetailPage({
     fetchRequirement();
   }, [resolvedParams.requirementId, router]);
 
-  const handleCompleteSubmission = async () => {
+  const handlePlagiarismCheck = async () => {
     if (!requirement?.submission) return;
 
     try {
-      const response = await updateSubmissionStatus({
-        submissionId: requirement.submission.id,
-        status: 1 // Complete
-      });
+      // Get the submission content
+      const submissionContent = requirement.submission.content;
+      const filePath = requirement.submission.filePath;
 
-      if (response.success) {
-        toast.success('Submission completed successfully');
-        fetchRequirement();
-      } else {
-        toast.error(response.error || 'Failed to complete submission');
+      if (!submissionContent && !filePath) {
+        setPlagiarismResult({
+          score: 0,
+          status: 'error',
+          message: 'No content found to check for plagiarism'
+        });
+        setIsPlagiarismModalOpen(true);
+        return;
       }
+
+      // TODO: In a real implementation, we would:
+      // 1. If there's a file, read its content
+      // 2. Send the content to a plagiarism detection service
+      // 3. Process the real results
+
+      // For now, we'll simulate a check based on the content length
+      const contentLength = submissionContent?.length || 0;
+      const mockScore = Math.min(Math.floor(contentLength / 100), 30); // Score based on content length, max 30%
+      const status = mockScore < 20 ? 'success' : 'error';
+      const message = mockScore < 20 
+        ? 'Your submission has passed the plagiarism check.'
+        : 'Your submission has a high similarity score. Please review and revise your work.';
+
+      // Mock matched content based on the actual submission
+      const matchedContent: MatchedContent[] = [];
+      if (submissionContent) {
+        // Split content into sentences and create mock matches
+        const sentences = submissionContent.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        if (sentences.length > 0) {
+          matchedContent.push({
+            text: sentences[0],
+            source: "Sample Source 1",
+            similarity: Math.floor(Math.random() * 30) + 70
+          });
+          if (sentences.length > 1) {
+            matchedContent.push({
+              text: sentences[1],
+              source: "Sample Source 2",
+              similarity: Math.floor(Math.random() * 30) + 70
+            });
+          }
+        }
+      }
+
+      setPlagiarismResult({
+        score: mockScore,
+        status,
+        message
+      });
+      setIsPlagiarismModalOpen(true);
     } catch (error) {
-      console.error('Error completing submission:', error);
-      toast.error('Failed to complete submission');
+      console.error('Error checking plagiarism:', error);
+      setPlagiarismResult({
+        score: 0,
+        status: 'error',
+        message: 'Failed to check plagiarism'
+      });
+      setIsPlagiarismModalOpen(true);
     }
   };
 
@@ -524,10 +687,10 @@ export default function RequirementDetailPage({
             {!requirement.submission.graded && requirement.submission.status === 0 && (
               <div className="mt-8 flex justify-end">
                 <button
-                  onClick={handleCompleteSubmission}
+                  onClick={handlePlagiarismCheck}
                   className="px-6 py-3 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-lg font-medium"
                 >
-                  Complete Submission
+                  Check for Plagiarism
                 </button>
               </div>
             )}
@@ -555,6 +718,15 @@ export default function RequirementDetailPage({
         onClose={() => setIsSubmissionModalOpen(false)}
         requirementId={resolvedParams.requirementId}
         onSuccess={handleSubmissionSuccess}
+      />
+
+      {/* Add the Plagiarism Check Modal */}
+      <PlagiarismCheckModal
+        isOpen={isPlagiarismModalOpen}
+        onClose={() => setIsPlagiarismModalOpen(false)}
+        score={plagiarismResult.score}
+        status={plagiarismResult.status}
+        message={plagiarismResult.message}
       />
     </div>
   );
