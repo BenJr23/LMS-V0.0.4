@@ -6,7 +6,7 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'irknmlxwevdlhfqjdytv.supabase.co',
         port: '',
-        pathname: '/storage/v1/object/public/lms/subject-icons/**',
+        pathname: '/storage/v1/object/public/lms/**',
       },
     ],
   },

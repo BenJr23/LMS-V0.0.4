@@ -159,9 +159,19 @@ export async function deleteSubjectInstance(id: string) {
         userId: user.id
       },
       include: {
+        requirements: {
+          include: {
+            submissions: true
+          }
+        },
         announcements: true,
-        moduleFolders: true,
-        uploadedContents: true
+        moduleFolders: {
+          include: {
+            uploadedContents: true
+          }
+        },
+        uploadedContents: true,
+        enrolments: true
       }
     });
 
@@ -171,32 +181,49 @@ export async function deleteSubjectInstance(id: string) {
 
     // Delete all related records in a transaction
     await prisma.$transaction(async (tx) => {
-      // Delete all uploaded contents
-      if (subjectInstance.uploadedContents.length > 0) {
-        await tx.uploadedContent.deleteMany({
+      // Delete all submissions first (they depend on requirements and enrollments)
+      for (const requirement of subjectInstance.requirements) {
+        await tx.submission.deleteMany({
           where: {
-            subjectInstanceId: id
+            requirementId: requirement.id
           }
         });
       }
 
-      // Delete all module folders
-      if (subjectInstance.moduleFolders.length > 0) {
-        await tx.moduleFolder.deleteMany({
-          where: {
-            subjectInstanceId: id
-          }
-        });
-      }
+      // Delete all requirements
+      await tx.requirement.deleteMany({
+        where: {
+          subjectInstanceId: id
+        }
+      });
+
+      // Delete all uploaded contents
+      await tx.uploadedContent.deleteMany({
+        where: {
+          subjectInstanceId: id
+        }
+      });
+
+      // Delete all module folders (this will cascade delete their uploaded contents)
+      await tx.moduleFolder.deleteMany({
+        where: {
+          subjectInstanceId: id
+        }
+      });
 
       // Delete all announcements
-      if (subjectInstance.announcements.length > 0) {
-        await tx.announcement.deleteMany({
-          where: {
-            subjectInstanceId: id
-          }
-        });
-      }
+      await tx.announcement.deleteMany({
+        where: {
+          subjectInstanceId: id
+        }
+      });
+
+      // Delete all enrollments
+      await tx.enrolment.deleteMany({
+        where: {
+          subjectInstanceId: id
+        }
+      });
 
       // Finally delete the subject instance
       await tx.subjectInstance.delete({

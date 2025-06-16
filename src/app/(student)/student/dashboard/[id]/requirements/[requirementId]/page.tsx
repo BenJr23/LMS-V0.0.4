@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
-import { ArrowLeft, FileText, Calendar, Award, MessageSquare, Upload } from 'lucide-react';
+import { useState, useEffect, use, useRef } from 'react';
+import { ArrowLeft, FileText, Calendar, Award, MessageSquare, Upload, X, Loader2, Download } from 'lucide-react';
 import { getStudentRequirementDetail } from '@/app/_actions/requirement';
+import { createSubmission, updateSubmissionStatus } from '@/app/_actions/submission';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
+import RichTextEditor from '@/components/RichTextEditor';
+import { uploadRequirementFile } from '@/app/_actions/uploadRequirement';
 
 interface RequirementDetail {
   id: string;
@@ -39,6 +42,256 @@ interface RequirementDetail {
   };
 }
 
+interface SubmissionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  requirementId: string;
+  onSuccess: () => void;
+}
+
+function FileUploadBox({ onFileSelect }: { onFileSelect: (file: File | null) => void }) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      setUploadedFile(file);
+      onFileSelect(file);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      setUploadedFile(file);
+      onFileSelect(file);
+    }
+  };
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const removeFile = () => {
+    setUploadedFile(null);
+    onFileSelect(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div
+      className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        isDragging ? 'border-[#800000] bg-pink-50' : 'border-gray-300 hover:border-[#800000]'
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.txt"
+      />
+      
+      {uploadedFile ? (
+        <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center space-x-3">
+            <FileText className="w-6 h-6 text-[#800000]" />
+            <span className="text-sm text-gray-700">{uploadedFile.name}</span>
+          </div>
+          <button
+            onClick={removeFile}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Upload className="w-12 h-12 text-gray-400 mx-auto" />
+          <div className="space-y-2">
+            <p className="text-gray-600">
+              Drag and drop your file here, or{' '}
+              <button
+                type="button"
+                onClick={handleButtonClick}
+                className="text-[#800000] hover:text-[#800000]/80 font-medium"
+              >
+                browse
+              </button>
+            </p>
+            <p className="text-sm text-gray-500">
+              Supported formats: PDF, DOC, DOCX, TXT
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: SubmissionModalProps) {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setUploadProgress(0);
+      
+      let filePath = '';
+      if (file) {
+        const uploadResponse = await uploadRequirementFile(file);
+        if (!uploadResponse.success || !uploadResponse.path) {
+          throw new Error(uploadResponse.error || 'Failed to upload file');
+        }
+        filePath = uploadResponse.path;
+        setUploadProgress(100);
+      }
+
+      const response = await createSubmission({
+        requirementId,
+        title,
+        content,
+        filePath
+      });
+
+      if (response.success) {
+        toast.success('Submission created successfully');
+        onSuccess();
+        onClose();
+      } else {
+        toast.error(response.error || 'Failed to create submission');
+      }
+    } catch (error) {
+      console.error('Error creating submission:', error);
+      toast.error('Failed to create submission');
+    } finally {
+      setIsSubmitting(false);
+      setUploadProgress(0);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-900">Create Submission</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+              Title
+            </label>
+            <input
+              type="text"
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#800000] focus:border-transparent"
+              placeholder="Enter submission title"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+              Content
+            </label>
+            <div className="border border-gray-300 rounded-lg">
+              <RichTextEditor
+                initialValue={content}
+                onChange={setContent}
+                placeholder="Enter your submission content..."
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Attach File (Optional)
+            </label>
+            <FileUploadBox onFileSelect={setFile} />
+          </div>
+
+          {uploadProgress > 0 && (
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-[#800000] h-2 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2.5 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Submission'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function RequirementDetailPage({ 
   params 
 }: { 
@@ -48,30 +301,52 @@ export default function RequirementDetailPage({
   const resolvedParams = use(params);
   const [requirement, setRequirement] = useState<RequirementDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchRequirement = async () => {
-      try {
-        setLoading(true);
-        const response = await getStudentRequirementDetail(resolvedParams.requirementId);
-        
-        if (response.success && response.data) {
-          setRequirement(response.data);
-        } else {
-          toast.error('Failed to load requirement details');
-          router.back();
-        }
-      } catch (error) {
-        console.error('Error fetching requirement:', error);
+  const fetchRequirement = async () => {
+    try {
+      setLoading(true);
+      const response = await getStudentRequirementDetail(resolvedParams.requirementId);
+      
+      if (response.success && response.data) {
+        setRequirement(response.data as RequirementDetail);
+      } else {
         toast.error('Failed to load requirement details');
         router.back();
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching requirement:', error);
+      toast.error('Failed to load requirement details');
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchRequirement();
   }, [resolvedParams.requirementId, router]);
+
+  const handleCompleteSubmission = async () => {
+    if (!requirement?.submission) return;
+
+    try {
+      const response = await updateSubmissionStatus({
+        submissionId: requirement.submission.id,
+        status: 1 // Complete
+      });
+
+      if (response.success) {
+        toast.success('Submission completed successfully');
+        fetchRequirement();
+      } else {
+        toast.error(response.error || 'Failed to complete submission');
+      }
+    } catch (error) {
+      console.error('Error completing submission:', error);
+      toast.error('Failed to complete submission');
+    }
+  };
 
   if (loading) {
     return (
@@ -92,19 +367,6 @@ export default function RequirementDetailPage({
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'GRADED':
-        return 'bg-green-100 text-green-800';
-      case 'SUBMITTED':
-        return 'bg-blue-100 text-blue-800';
-      case 'NOT_SUBMITTED':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getSubmissionStatusText = (submission: RequirementDetail['submission']) => {
     if (!submission) return 'Not Submitted';
     if (submission.graded) return `Graded (${submission.score}/${requirement.scoreBase})`;
@@ -117,6 +379,10 @@ export default function RequirementDetailPage({
     if (submission.graded) return 'bg-green-100 text-green-800';
     if (submission.status === 1) return 'bg-blue-100 text-blue-800';
     return 'bg-yellow-100 text-yellow-800';
+  };
+
+  const handleSubmissionSuccess = () => {
+    fetchRequirement();
   };
 
   return (
@@ -198,15 +464,26 @@ export default function RequirementDetailPage({
             {requirement.submission.filePath && (
               <div className="p-6 bg-pink-50/50 rounded-xl">
                 <h3 className="text-base font-semibold text-gray-700 mb-3">Attached File</h3>
-                <a 
-                  href={requirement.submission.filePath}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-5 py-2.5 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-base"
-                >
-                  <FileText className="w-5 h-5 mr-2" />
-                  View Submission
-                </a>
+                {requirement.submission.filePath.toLowerCase().endsWith('.pdf') ? (
+                  <a 
+                    href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lms/${requirement.submission.filePath}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-5 py-2.5 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-base"
+                  >
+                    <FileText className="w-5 h-5 mr-2" />
+                    View PDF
+                  </a>
+                ) : (
+                  <a 
+                    href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lms/${requirement.submission.filePath}`}
+                    download
+                    className="inline-flex items-center px-5 py-2.5 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-base"
+                  >
+                    <Download className="w-5 h-5 mr-2" />
+                    Download File
+                  </a>
+                )}
               </div>
             )}
 
@@ -247,10 +524,7 @@ export default function RequirementDetailPage({
             {!requirement.submission.graded && requirement.submission.status === 0 && (
               <div className="mt-8 flex justify-end">
                 <button
-                  onClick={() => {
-                    // TODO: Implement complete submission functionality
-                    console.log('Complete submission:', requirement.submission?.id);
-                  }}
+                  onClick={handleCompleteSubmission}
                   className="px-6 py-3 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-lg font-medium"
                 >
                   Complete Submission
@@ -266,10 +540,7 @@ export default function RequirementDetailPage({
             <h3 className="text-2xl font-semibold text-gray-900 mb-3">No Submission Yet</h3>
             <p className="text-gray-600 text-lg mb-6">You haven&apos;t submitted your work for this requirement.</p>
             <button
-              onClick={() => {
-                // TODO: Implement submission functionality
-                console.log('Submit requirement:', requirement.id);
-              }}
+              onClick={() => setIsSubmissionModalOpen(true)}
               className="px-6 py-3 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-lg font-medium"
             >
               Start Submission
@@ -277,6 +548,14 @@ export default function RequirementDetailPage({
           </div>
         </div>
       )}
+
+      {/* Add the Submission Modal */}
+      <SubmissionModal
+        isOpen={isSubmissionModalOpen}
+        onClose={() => setIsSubmissionModalOpen(false)}
+        requirementId={resolvedParams.requirementId}
+        onSuccess={handleSubmissionSuccess}
+      />
     </div>
   );
 } 

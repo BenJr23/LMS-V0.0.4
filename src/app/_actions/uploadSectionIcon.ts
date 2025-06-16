@@ -46,11 +46,17 @@ export async function uploadSectionIcon(file: File) {
       throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
+    // Get the public URL
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from('lms')
+      .getPublicUrl(filePath);
+
     console.log('Upload successful, file path:', filePath);
 
     return { 
       success: true, 
-      path: filePath 
+      path: filePath,
+      url: publicUrl
     };
   } catch (error) {
     console.error('Upload error:', error);
