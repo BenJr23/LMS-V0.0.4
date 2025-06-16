@@ -52,6 +52,7 @@ interface Submission {
   graded: boolean;
   score: number | null;
   feedback: string | null;
+  status: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -146,9 +147,16 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
       };
     }
 
+    if (requirement.submission.status === 1) {
+      return {
+        text: 'Submitted',
+        color: 'bg-blue-100 text-blue-800'
+      };
+    }
+
     return {
-      text: 'Submitted',
-      color: 'bg-blue-100 text-blue-800'
+      text: 'Draft',
+      color: 'bg-yellow-100 text-yellow-800'
     };
   };
 

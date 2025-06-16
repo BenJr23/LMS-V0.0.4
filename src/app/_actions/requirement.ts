@@ -158,6 +158,7 @@ export async function getStudentRequirements(subjectInstanceId: string) {
             graded: true,
             score: true,
             feedback: true,
+            status: true,
             createdAt: true,
             updatedAt: true
           }
