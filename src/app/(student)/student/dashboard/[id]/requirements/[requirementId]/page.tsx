@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, use, useRef } from 'react';
-import { ArrowLeft, FileText, Calendar, Award, MessageSquare, Upload, X, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Award, MessageSquare, Upload, X, Loader2, Download, AlertTriangle } from 'lucide-react';
 import { getStudentRequirementDetail } from '@/app/_actions/requirement';
-import { createSubmission, updateSubmissionStatus } from '@/app/_actions/submission';
+import { createSubmission, updateSubmissionStatus, editSubmission, deleteSubmission } from '@/app/_actions/submission';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
@@ -47,6 +47,14 @@ interface SubmissionModalProps {
   onClose: () => void;
   requirementId: string;
   onSuccess: () => void;
+  initialData?: { title: string; content: string; filePath: string };
+}
+
+interface DeleteConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
 }
 
 function FileUploadBox({ onFileSelect }: { onFileSelect: (file: File | null) => void }) {
@@ -151,9 +159,9 @@ function FileUploadBox({ onFileSelect }: { onFileSelect: (file: File | null) => 
   );
 }
 
-function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: SubmissionModalProps) {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+function SubmissionModal({ isOpen, onClose, requirementId, onSuccess, initialData }: SubmissionModalProps & { initialData?: { title: string; content: string; filePath: string } }) {
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [content, setContent] = useState(initialData?.content || '');
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -198,7 +206,7 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
       setIsSubmitting(true);
       setUploadProgress(0);
       
-      let filePath = '';
+      let filePath = initialData?.filePath || '';
       if (file && requirementType !== 'FORUM' && requirementType !== 'QUIZ') {
         const uploadResponse = await uploadRequirementFile(file);
         if (!uploadResponse.success || !uploadResponse.path) {
@@ -208,24 +216,31 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
         setUploadProgress(100);
       }
 
-      const response = await createSubmission({
-        requirementId,
-        title,
-        content,
-        filePath
-      });
+      const response = initialData 
+        ? await editSubmission({
+            submissionId: requirementId,
+            title,
+            content,
+            filePath
+          })
+        : await createSubmission({
+            requirementId,
+            title,
+            content,
+            filePath
+          });
 
       if (response.success) {
-        toast.success('Submission created successfully');
+        toast.success(initialData ? 'Submission updated successfully' : 'Submission created successfully');
         resetForm();
         onSuccess();
         onClose();
       } else {
-        toast.error(response.error || 'Failed to create submission');
+        toast.error(response.error || (initialData ? 'Failed to update submission' : 'Failed to create submission'));
       }
     } catch (error) {
-      console.error('Error creating submission:', error);
-      toast.error('Failed to create submission');
+      console.error('Error handling submission:', error);
+      toast.error(initialData ? 'Failed to update submission' : 'Failed to create submission');
     } finally {
       setIsSubmitting(false);
       setUploadProgress(0);
@@ -340,6 +355,51 @@ function SubmissionModal({ isOpen, onClose, requirementId, onSuccess }: Submissi
   );
 }
 
+function DeleteConfirmationModal({ isOpen, onClose, onConfirm, isDeleting }: DeleteConfirmationModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-red-100 p-2 rounded-full">
+              <AlertTriangle className="w-6 h-6 text-red-500" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900">Delete Submission</h2>
+          </div>
+          <p className="text-gray-600">
+            Are you sure you want to delete this submission? This action cannot be undone.
+          </p>
+        </div>
+        <div className="p-6 flex justify-end gap-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={isDeleting}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              'Delete'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RequirementDetailPage({ 
   params 
 }: { 
@@ -350,6 +410,9 @@ export default function RequirementDetailPage({
   const [requirement, setRequirement] = useState<RequirementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchRequirement = async () => {
     try {
@@ -396,6 +459,32 @@ export default function RequirementDetailPage({
     }
   };
 
+  const handleDeleteSubmission = async () => {
+    if (!requirement?.submission) return;
+
+    try {
+      setIsDeleting(true);
+      const response = await deleteSubmission(requirement.submission.id);
+
+      if (response.success) {
+        toast.success('Submission deleted successfully');
+        fetchRequirement();
+        setIsDeleteModalOpen(false);
+      } else {
+        toast.error(response.error || 'Failed to delete submission');
+      }
+    } catch (error) {
+      console.error('Error deleting submission:', error);
+      toast.error('Failed to delete submission');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSubmissionSuccess = () => {
+    fetchRequirement();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -427,10 +516,6 @@ export default function RequirementDetailPage({
     if (submission.graded) return 'bg-green-100 text-green-800';
     if (submission.status === 1) return 'bg-blue-100 text-blue-800';
     return 'bg-yellow-100 text-yellow-800';
-  };
-
-  const handleSubmissionSuccess = () => {
-    fetchRequirement();
   };
 
   return (
@@ -570,7 +655,19 @@ export default function RequirementDetailPage({
             )}
 
             {!requirement.submission.graded && requirement.submission.status === 0 && (
-              <div className="mt-8 flex justify-end">
+              <div className="mt-8 flex justify-end gap-4">
+                <button
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  className="px-6 py-3 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors text-lg font-medium"
+                >
+                  Delete Submission
+                </button>
+                <button
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="px-6 py-3 border border-[#800000] text-[#800000] rounded-lg hover:bg-pink-50 transition-colors text-lg font-medium"
+                >
+                  Edit Submission
+                </button>
                 <button
                   onClick={handleCompleteSubmission}
                   className="px-6 py-3 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors text-lg font-medium"
@@ -600,6 +697,27 @@ export default function RequirementDetailPage({
         onClose={() => setIsSubmissionModalOpen(false)}
         requirementId={resolvedParams.requirementId}
         onSuccess={handleSubmissionSuccess}
+      />
+
+      {/* Add the Edit Submission Modal */}
+      <SubmissionModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        requirementId={requirement.submission?.id || ''}
+        onSuccess={handleSubmissionSuccess}
+        initialData={requirement.submission ? {
+          title: requirement.submission.title,
+          content: requirement.submission.content,
+          filePath: requirement.submission.filePath
+        } : undefined}
+      />
+
+      {/* Add the Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteSubmission}
+        isDeleting={isDeleting}
       />
     </div>
   );
