@@ -2,10 +2,11 @@
 
 import { useState, useEffect, use } from 'react';
 import { ArrowLeft, Calendar, Award, Eye } from 'lucide-react';
-import { getTeacherRequirementDetail } from '@/app/_actions/teacherview';
+import { getTeacherRequirementDetail, submitGrade } from '@/app/_actions/teacherview';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
+import RichTextEditor from '@/components/RichTextEditor';
 
 interface Submission {
   id: string;
@@ -57,6 +58,9 @@ export default function TeacherRequirementDetailPage({ params }: { params: Promi
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
+  const [grade, setGrade] = useState<string>('');
+  const [feedback, setFeedback] = useState<string>('');
 
   useEffect(() => {
     const fetchRequirement = async () => {
@@ -84,6 +88,42 @@ export default function TeacherRequirementDetailPage({ params }: { params: Promi
   const handleViewSubmission = (submission: Submission) => {
     setSelectedSubmission(submission);
     setIsViewModalOpen(true);
+  };
+
+  const handleGradeSubmission = async () => {
+    if (!selectedSubmission || !requirement) return;
+
+    try {
+      const gradeValue = parseFloat(grade);
+      if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > requirement.scoreBase) {
+        toast.error(`Grade must be between 0 and ${requirement.scoreBase}`);
+        return;
+      }
+
+      const response = await submitGrade(
+        selectedSubmission.id,
+        gradeValue,
+        feedback
+      );
+
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+
+      toast.success('Grade submitted successfully');
+      setIsGradeModalOpen(false);
+      setGrade('');
+      setFeedback('');
+      
+      // Refresh the requirement data
+      const refreshResponse = await getTeacherRequirementDetail(resolvedParams.requirementId);
+      if (refreshResponse.success && refreshResponse.data) {
+        setRequirement(refreshResponse.data as unknown as RequirementDetail);
+      }
+    } catch (error) {
+      console.error('Error submitting grade:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to submit grade');
+    }
   };
 
   if (loading) {
@@ -307,12 +347,82 @@ export default function TeacherRequirementDetailPage({ params }: { params: Promi
                 </div>
               </div>
             </div>
-            <div className="p-6 flex justify-end">
+            <div className="p-6 flex justify-end gap-4">
+              {!selectedSubmission.graded && (
+                <button
+                  onClick={() => setIsGradeModalOpen(true)}
+                  className="px-4 py-2 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors"
+                >
+                  Grade Submission
+                </button>
+              )}
               <button
                 onClick={() => setIsViewModalOpen(false)}
                 className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grade Modal */}
+      {isGradeModalOpen && selectedSubmission && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Grade Submission</h2>
+              <div className="space-y-6">
+                {/* Grade Input */}
+                <div>
+                  <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-2">
+                    Grade (out of {requirement?.scoreBase})
+                  </label>
+                  <input
+                    type="number"
+                    id="grade"
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    min="0"
+                    max={requirement?.scoreBase}
+                    step="0.1"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#800000] focus:border-[#800000] text-gray-900"
+                    placeholder="Enter grade"
+                  />
+                </div>
+
+                {/* Feedback Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Feedback
+                  </label>
+                  <div className="border border-gray-300 rounded-lg overflow-hidden">
+                    <RichTextEditor
+                      content={feedback}
+                      onChange={setFeedback}
+                      placeholder="Enter feedback for the student"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 flex justify-end gap-4">
+              <button
+                onClick={() => {
+                  setIsGradeModalOpen(false);
+                  setGrade('');
+                  setFeedback('');
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGradeSubmission}
+                className="px-4 py-2 bg-[#800000] text-white rounded-lg hover:bg-[#800000]/90 transition-colors"
+              >
+                Submit Grade
               </button>
             </div>
           </div>
