@@ -98,6 +98,8 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   const [imageUrl, setImageUrl] = useState<string>('');
   const [selectedRequirementType, setSelectedRequirementType] = useState('ASSIGNMENTS');
   const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [isSubjectDeleteModalOpen, setIsSubjectDeleteModalOpen] = useState(false);
+  const [isDeletingSubject, setIsDeletingSubject] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -153,11 +155,8 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   ];
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this subject instance? This action cannot be undone.')) {
-      return;
-    }
-
     try {
+      setIsDeletingSubject(true);
       const result = await deleteSubjectInstance(resolvedParams.id);
       if (result.success) {
         toast.success('Subject instance deleted successfully');
@@ -168,6 +167,9 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
     } catch (error) {
       console.error('Error deleting subject instance:', error);
       toast.error('Failed to delete subject instance');
+    } finally {
+      setIsDeletingSubject(false);
+      setIsSubjectDeleteModalOpen(false);
     }
   };
 
@@ -451,7 +453,7 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
 
             <div className="flex justify-between mt-6">
               <button
-                onClick={handleDelete}
+                onClick={() => setIsSubjectDeleteModalOpen(true)}
                 className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors duration-200"
               >
                 Delete Subject
@@ -470,6 +472,48 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
                   Save Changes
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subject Delete Confirmation Modal */}
+      {isSubjectDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-200 scale-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-50 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Delete Subject</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this subject instance? This action cannot be undone and will permanently remove all associated data including requirements, announcements, and student enrollments.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsSubjectDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeletingSubject}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors duration-200 font-medium flex items-center gap-2"
+              >
+                {isDeletingSubject ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Subject
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

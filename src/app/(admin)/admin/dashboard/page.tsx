@@ -610,7 +610,7 @@ export default function AdminDashboard() {
                 <div>
                   <h4 className="text-lg font-medium text-gray-900">Are you sure?</h4>
                   <p className="mt-1 text-sm text-gray-500">
-                    This action cannot be undone. This will permanently delete the subject "{selectedSubject.name}".
+                    This action cannot be undone. This will permanently delete the subject &quot;{selectedSubject.name}&quot;.
                   </p>
                 </div>
           </div>

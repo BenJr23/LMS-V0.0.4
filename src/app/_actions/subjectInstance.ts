@@ -291,10 +291,6 @@ export async function getStudentSubjectInstance(id: string) {
       }
     });
 
-    if (!subjectInstance) {
-      throw new Error('Subject instance not found.');
-    }
-
     return subjectInstance;
   } catch (error) {
     console.error('Error fetching student subject instance:', error);
