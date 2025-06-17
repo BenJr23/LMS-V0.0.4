@@ -118,6 +118,8 @@ model Submission {
   title         String
   content       String
   filePath      String
+  plagiarismContent String?
+  plagiarismScore Float?
   status        Int         @default(0) // 0 = draft, 1 = complete
   graded        Boolean     @default(false)
   score         Float?
