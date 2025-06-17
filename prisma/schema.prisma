@@ -13,64 +13,58 @@ model Subject {
   id          String            @id @default(cuid())
   name        String
   code        String            @unique
-  createdById String
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-
+  createdById String
   instances   SubjectInstance[]
 }
 
 model SubjectInstance {
   id               String            @id @default(cuid())
-  subjectId        String
-  userId           String            //clerkuserID
   teacherName      String
   grade            String
   section          String
-  enrollment       Int               @default(1)  // 1 for active, 0 for inactive
-  enrolmentCode    Int
   icon             String
+  subjectId        String
   createdAt        DateTime          @default(now())
+  enrolmentCode    Int
   updatedAt        DateTime          @updatedAt
-
-  subject          Subject           @relation(fields: [subjectId], references: [id])
+  userId           String
+  enrollment       Int               @default(1)
   announcements    Announcement[]
-  enrolments       Enrolment[]
+  enrolments       Enrolment?
   moduleFolders    ModuleFolder[]
   requirements     Requirement[]
+  subject          Subject           @relation(fields: [subjectId], references: [id])
   uploadedContents UploadedContent[]
 }
 
 model Requirement {
   id                String          @id @default(cuid())
-  subjectInstanceId String
   title             String
   content           String
   scoreBase         Int
   deadline          DateTime
   type              String
-  requirementNumber Int
+  subjectInstanceId String
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-
+  requirementNumber Int
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
   submissions       Submission[]
 }
 
 model Enrolment {
   id                String          @id @default(cuid())
-  subjectInstanceId String
-  studentId         String          //clerk ID
-  email             String          
+  subjectInstanceId String          @unique
   code              Int
   hasNewContent     Boolean         @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-
+  studentId         String
+  email             String
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
   submissions       Submission[]
-
-  @@unique([subjectInstanceId])  // prevent duplicate enrolment per subject instance
 }
 
 model Announcement {
@@ -81,19 +75,17 @@ model Announcement {
   content           String
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
 }
 
 model ModuleFolder {
-  id                String          @id @default(cuid())
+  id                String            @id @default(cuid())
   subjectInstanceId String
   userId            String
   folderName        String
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-
-  subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  subjectInstance   SubjectInstance   @relation(fields: [subjectInstanceId], references: [id])
   uploadedContents  UploadedContent[]
 }
 
@@ -105,7 +97,6 @@ model UploadedContent {
   filePath          String
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-
   moduleFolder      ModuleFolder    @relation(fields: [moduleFolderId], references: [id])
   subjectInstance   SubjectInstance @relation(fields: [subjectInstanceId], references: [id])
 }
@@ -118,40 +109,36 @@ model Submission {
   title         String
   content       String
   filePath      String
-  status        Int         @default(0) // 0 = draft, 1 = complete
   graded        Boolean     @default(false)
   score         Float?
   feedback      String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-
-  requirement   Requirement @relation(fields: [requirementId], references: [id])
+  status        Int         @default(0)
   enrollment    Enrolment   @relation(fields: [enrollmentId], references: [id])
+  requirement   Requirement @relation(fields: [requirementId], references: [id])
 }
 
 model Student {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   fetchID         Int
   name            String
-  email           String    @unique
-  role            String    
+  email           String   @unique
+  role            String
   gradeLevel      String
-  status          String    
-  studentNumber   String    
+  status          String
+  studentNumber   String
   dateOfBirth     DateTime
   gender          String
   guardianName    String
   guardianContact String
   address         String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Faculty {
-  id              String    @id @default(cuid())
-  email           String    @unique
-  role            String 
+  id    String @id @default(cuid())
+  email String @unique
+  role  String
 }
-

@@ -58,6 +58,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   Dashboard
                 </Link>
               </li>
+              <li>
+                <Link href="/faculty/ai_analytics" className="block px-4 py-2 rounded-lg hover:bg-white/20 transition font-medium">
+                  AI Analytics
+                </Link>
+              </li>
             </ul>
           </nav>
         </div>
