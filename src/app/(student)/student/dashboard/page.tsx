@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Users, Clock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getEnrolledSubjects } from '@/app/_actions/enrolledsubjects';
+import { getEnrolledSubjects, updateEnrollmentStatus } from '@/app/_actions/enrolledsubjects';
 import { toast } from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
 import { getImageUrl } from '@/app/_actions/uploadIcon';
@@ -86,8 +86,27 @@ export default function DashboardPage() {
     updateImageUrls();
   }, [enrolledSubjects, imageUrls]);
 
-  const handleSubjectClick = (enrollment: EnrolledSubject) => {
-    router.push(`/student/dashboard/${enrollment.subjectInstance.id}`);
+  const handleSubjectClick = async (enrollment: EnrolledSubject) => {
+    try {
+      // Update the enrollment status
+      const result = await updateEnrollmentStatus(enrollment.id);
+      if (result.success) {
+        // Update the local state to remove the notification dot
+        setEnrolledSubjects(prev => 
+          prev.map(e => 
+            e.id === enrollment.id 
+              ? { ...e, hasNewContent: false }
+              : e
+          )
+        );
+      }
+      // Navigate to the subject page
+      router.push(`/student/dashboard/${enrollment.subjectInstance.id}`);
+    } catch (error) {
+      console.error('Error updating enrollment status:', error);
+      // Still navigate even if the status update fails
+      router.push(`/student/dashboard/${enrollment.subjectInstance.id}`);
+    }
   };
 
   if (loading) {

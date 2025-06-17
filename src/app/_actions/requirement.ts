@@ -58,17 +58,32 @@ export async function createRequirement(data: CreateRequirementInput) {
       }
     });
 
-    // Create the requirement
-    const requirement = await prisma.requirement.create({
-      data: {
-        subjectInstanceId: data.subjectInstanceId,
-        title: data.title,
-        content: data.content,
-        scoreBase: data.scoreBase,
-        deadline: data.deadline,
-        type: data.type,
-        requirementNumber: (latestRequirement?.requirementNumber || 0) + 1
-      }
+    // Create the requirement and update enrollments in a transaction
+    const requirement = await prisma.$transaction(async (tx) => {
+      // Create the requirement
+      const newRequirement = await tx.requirement.create({
+        data: {
+          subjectInstanceId: data.subjectInstanceId,
+          title: data.title,
+          content: data.content,
+          scoreBase: data.scoreBase,
+          deadline: data.deadline,
+          type: data.type,
+          requirementNumber: (latestRequirement?.requirementNumber || 0) + 1
+        }
+      });
+
+      // Update all enrollments for this subject instance
+      await tx.enrolment.updateMany({
+        where: {
+          subjectInstanceId: data.subjectInstanceId
+        },
+        data: {
+          hasNewContent: true
+        }
+      });
+
+      return newRequirement;
     });
 
     return {
@@ -299,17 +314,32 @@ export async function editRequirement(data: EditRequirementInput) {
       throw new Error('Requirement not found or you do not have permission to edit it.');
     }
 
-    // Update the requirement
-    const updatedRequirement = await prisma.requirement.update({
-      where: {
-        id: data.requirementId
-      },
-      data: {
-        title: data.title,
-        content: data.content,
-        scoreBase: data.scoreBase,
-        deadline: data.deadline
-      }
+    // Update the requirement and enrollments in a transaction
+    const updatedRequirement = await prisma.$transaction(async (tx) => {
+      // Update the requirement
+      const updated = await tx.requirement.update({
+        where: {
+          id: data.requirementId
+        },
+        data: {
+          title: data.title,
+          content: data.content,
+          scoreBase: data.scoreBase,
+          deadline: data.deadline
+        }
+      });
+
+      // Update all enrollments for this subject instance
+      await tx.enrolment.updateMany({
+        where: {
+          subjectInstanceId: requirement.subjectInstanceId
+        },
+        data: {
+          hasNewContent: true
+        }
+      });
+
+      return updated;
     });
 
     return {
@@ -347,16 +377,26 @@ export async function deleteRequirement(requirementId: string) {
       throw new Error('Requirement not found or you do not have permission to delete it.');
     }
 
-    // Delete the requirement and all related records in a transaction
+    // Delete the requirement and update enrollments in a transaction
     await prisma.$transaction(async (tx) => {
       // Delete all submissions first
       await tx.submission.deleteMany({
         where: { requirementId }
       });
 
-      // Finally, delete the requirement itself
+      // Delete the requirement itself
       await tx.requirement.delete({
         where: { id: requirementId }
+      });
+
+      // Update all enrollments for this subject instance
+      await tx.enrolment.updateMany({
+        where: {
+          subjectInstanceId: requirement.subjectInstanceId
+        },
+        data: {
+          hasNewContent: true
+        }
       });
     });
 
