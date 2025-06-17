@@ -24,10 +24,10 @@ export default function RequirementDetailPage({
         }
       } catch (error) {
         console.error('Error fetching requirement type:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchRequirementType();
   }, [resolvedParams.requirementId]);

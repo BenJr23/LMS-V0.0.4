@@ -4,7 +4,7 @@ import { useState, use, useEffect } from 'react';
 import { Bell, FileText, ClipboardList, File, FileText as FileTextIcon, UserCircle2, Settings, MessageSquare, HelpCircle, Users, Calendar, Plus, Eye, Trash2, AlertTriangle, Pencil } from 'lucide-react';
 import { getSubjectInstance, deleteSubjectInstance } from '@/app/_actions/subjectInstance';
 import { getImageUrl } from '@/app/_actions/uploadIcon';
-import { createRequirement, getRequirements } from '@/app/_actions/requirement';
+import { createRequirement, getRequirements, editRequirement } from '@/app/_actions/requirement';
 import toast from 'react-hot-toast';
 import RichTextEditor from '@/components/RichTextEditor';
 import { useRouter } from 'next/navigation';
@@ -172,6 +172,8 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   };
 
   const handleAddRequirement = (type: string) => {
+    // Reset selected requirement when creating new
+    setSelectedRequirement(null);
     setSelectedRequirementType(type);
     setAssignmentForm({
       title: '',
@@ -179,6 +181,39 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
       deadline: '',
       baseScore: '',
       type: type.charAt(0) + type.slice(1).toLowerCase()
+    });
+    setIsAddAssignmentModalOpen(true);
+  };
+
+  const getRequirementLabels = (type: string) => {
+    const baseType = type.replace('S', '');
+    const formattedType = baseType.charAt(0) + baseType.slice(1).toLowerCase();
+    const isEditing = !!selectedRequirement;
+    return {
+      title: isEditing ? `Edit ${formattedType}` : `Create new ${formattedType}`,
+      titleField: `${formattedType} title`,
+      contentField: `${formattedType} instructions`,
+      deadlineField: `${formattedType} deadline`,
+      pointsField: `${formattedType} points`,
+      submitButton: isEditing ? `Save Changes` : `Create ${formattedType}`,
+      description: isEditing 
+        ? `Edit the details of this ${formattedType.toLowerCase()}.`
+        : `Create a new ${formattedType.toLowerCase()} for your students to complete.`,
+      titlePlaceholder: `Enter ${formattedType.toLowerCase()} title...`,
+      contentPlaceholder: `Enter ${formattedType.toLowerCase()} instructions...`,
+      pointsPlaceholder: `Enter ${formattedType.toLowerCase()} points...`
+    };
+  };
+
+  const handleEditRequirement = (requirement: Requirement) => {
+    setSelectedRequirement(requirement);
+    setSelectedRequirementType(requirement.type);
+    setAssignmentForm({
+      title: requirement.title,
+      content: requirement.content,
+      deadline: new Date(requirement.deadline).toISOString().slice(0, 16),
+      baseScore: requirement.scoreBase.toString(),
+      type: requirement.type
     });
     setIsAddAssignmentModalOpen(true);
   };
@@ -192,19 +227,32 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
 
       const requirementType = selectedRequirementType as 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
       
-      const result = await createRequirement({
-        subjectInstanceId: resolvedParams.id,
-        title: assignmentForm.title,
-        content: assignmentForm.content,
-        scoreBase: parseInt(assignmentForm.baseScore),
-        deadline: new Date(assignmentForm.deadline),
-        type: requirementType
-      });
+      let result;
+      if (selectedRequirement) {
+        // Edit existing requirement
+        result = await editRequirement({
+          requirementId: selectedRequirement.id,
+          title: assignmentForm.title,
+          content: assignmentForm.content,
+          scoreBase: parseInt(assignmentForm.baseScore),
+          deadline: new Date(assignmentForm.deadline)
+        });
+      } else {
+        // Create new requirement
+        result = await createRequirement({
+          subjectInstanceId: resolvedParams.id,
+          title: assignmentForm.title,
+          content: assignmentForm.content,
+          scoreBase: parseInt(assignmentForm.baseScore),
+          deadline: new Date(assignmentForm.deadline),
+          type: requirementType
+        });
+      }
 
       if (result.success) {
-        toast.success(`${requirementType} created successfully!`);
+        toast.success(selectedRequirement ? 'Requirement updated successfully!' : `${requirementType} created successfully!`);
         setIsAddAssignmentModalOpen(false);
-        // Reset form
+        // Reset form and selected requirement
         setAssignmentForm({
           title: '',
           content: '',
@@ -212,48 +260,20 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
           baseScore: '',
           type: 'Assignment'
         });
+        setSelectedRequirement(null);
         // Refresh requirements data
         const updatedRequirements = await getRequirements(resolvedParams.id);
         if (updatedRequirements.success && updatedRequirements.data) {
           setRequirements(updatedRequirements.data);
         }
       } else {
-        toast.error(result.error || `Failed to create ${requirementType.toLowerCase()}`);
+        toast.error(result.error || (selectedRequirement ? 'Failed to update requirement' : `Failed to create ${requirementType.toLowerCase()}`));
       }
     } catch (error) {
-      console.error('Error creating requirement:', error);
+      console.error('Error handling requirement:', error);
       const requirementType = selectedRequirementType as 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
-      toast.error(`Failed to create ${requirementType.toLowerCase()}`);
+      toast.error(selectedRequirement ? 'Failed to update requirement' : `Failed to create ${requirementType.toLowerCase()}`);
     }
-  };
-
-  const getRequirementLabels = (type: string) => {
-    const baseType = type.replace('S', '');
-    const formattedType = baseType.charAt(0) + baseType.slice(1).toLowerCase();
-    return {
-      title: `Create new ${formattedType}`,
-      titleField: `${formattedType} title`,
-      contentField: `${formattedType} instructions`,
-      deadlineField: `${formattedType} deadline`,
-      pointsField: `${formattedType} points`,
-      submitButton: `Create ${formattedType}`,
-      description: `Create a new ${formattedType.toLowerCase()} for your students to complete.`,
-      titlePlaceholder: `Enter ${formattedType.toLowerCase()} title...`,
-      contentPlaceholder: `Enter ${formattedType.toLowerCase()} instructions...`,
-      pointsPlaceholder: `Enter ${formattedType.toLowerCase()} points...`
-    };
-  };
-
-  const handleEditRequirement = (requirement: Requirement) => {
-    setSelectedRequirement(requirement);
-    setAssignmentForm({
-      title: requirement.title,
-      content: requirement.content,
-      deadline: new Date(requirement.deadline).toISOString().slice(0, 16),
-      baseScore: requirement.scoreBase.toString(),
-      type: requirement.type
-    });
-    setIsAddAssignmentModalOpen(true);
   };
 
   const handleDeleteRequirement = (requirement: Requirement) => {

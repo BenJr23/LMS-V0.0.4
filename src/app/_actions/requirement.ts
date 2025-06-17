@@ -14,6 +14,14 @@ type CreateRequirementInput = {
   type: 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
 };
 
+type EditRequirementInput = {
+  requirementId: string;
+  title: string;
+  content: string;
+  scoreBase: number;
+  deadline: Date;
+};
+
 export async function createRequirement(data: CreateRequirementInput) {
   try {
     const user = await currentUser();
@@ -260,6 +268,59 @@ export async function getStudentRequirementDetail(requirementId: string) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch requirement detail'
+    };
+  }
+}
+
+export async function editRequirement(data: EditRequirementInput) {
+  try {
+    const user = await currentUser();
+
+    if (!user || !user.id) {
+      throw new Error('User not authenticated.');
+    }
+
+    // Validate required fields
+    if (!data.requirementId || !data.title || !data.content || !data.scoreBase || !data.deadline) {
+      throw new Error('All fields are required.');
+    }
+
+    // Check if requirement exists and belongs to the user's subject instance
+    const requirement = await prisma.requirement.findFirst({
+      where: {
+        id: data.requirementId,
+        subjectInstance: {
+          userId: user.id
+        }
+      }
+    });
+
+    if (!requirement) {
+      throw new Error('Requirement not found or you do not have permission to edit it.');
+    }
+
+    // Update the requirement
+    const updatedRequirement = await prisma.requirement.update({
+      where: {
+        id: data.requirementId
+      },
+      data: {
+        title: data.title,
+        content: data.content,
+        scoreBase: data.scoreBase,
+        deadline: data.deadline
+      }
+    });
+
+    return {
+      success: true,
+      data: updatedRequirement
+    };
+  } catch (error) {
+    console.error('Error updating requirement:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update requirement'
     };
   }
 }

@@ -201,6 +201,7 @@ export default function TeacherRequirementDetailPage({ params }: { params: Promi
               <tr className="bg-pink-50 border-b border-pink-100">
                 <th className="p-4 text-left font-semibold text-[#800000]">Student Email</th>
                 <th className="p-4 text-left font-semibold text-[#800000]">Submission Title</th>
+                <th className="p-4 text-left font-semibold text-[#800000]">Grading Status</th>
                 <th className="p-4 text-left font-semibold text-[#800000]">Actions</th>
               </tr>
             </thead>
@@ -214,6 +215,15 @@ export default function TeacherRequirementDetailPage({ params }: { params: Promi
                   </td>
                   <td className="p-4 text-gray-700 font-medium">
                     {submission.title}
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      submission.graded 
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {submission.graded ? 'Graded' : 'Pending'}
+                    </span>
                   </td>
                   <td className="p-4">
                     <button
@@ -301,25 +311,27 @@ export default function TeacherRequirementDetailPage({ params }: { params: Promi
                   )}
                 </div>
 
-                {/* Attached File */}
-                <div className="bg-pink-50/50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Attached File</h3>
-                  {selectedSubmission.filePath ? (
-                    <a 
-                      href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lms/${selectedSubmission.filePath}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#800000] hover:text-[#800000]/80 font-medium inline-flex items-center gap-2"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
-                      </svg>
-                      View File
-                    </a>
-                  ) : (
-                    <p className="text-gray-500 italic">No file attached yet</p>
-                  )}
-                </div>
+                {/* Attached File - Only show if not a forum requirement */}
+                {requirement.type !== 'FORUM' && (
+                  <div className="bg-pink-50/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Attached File</h3>
+                    {selectedSubmission.filePath ? (
+                      <a 
+                        href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lms/${selectedSubmission.filePath}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#800000] hover:text-[#800000]/80 font-medium inline-flex items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                        </svg>
+                        View File
+                      </a>
+                    ) : (
+                      <p className="text-gray-500 italic">No file attached yet</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Grading Information */}
                 <div className="bg-green-50 p-4 rounded-lg">
