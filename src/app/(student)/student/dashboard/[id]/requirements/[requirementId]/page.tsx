@@ -3,6 +3,7 @@
 import { use } from 'react';
 import RequirementDetail from './components/RequirementDetail';
 import ForumRequirement from './components/ForumRequirement';
+import QuizRequirementDetail from './components/QuizRequirementDetail';
 import { getStudentRequirementDetail } from '@/app/_actions/requirement';
 import { useEffect, useState } from 'react';
 
@@ -24,10 +25,10 @@ export default function RequirementDetailPage({
         }
       } catch (error) {
         console.error('Error fetching requirement type:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchRequirementType();
   }, [resolvedParams.requirementId]);
@@ -42,6 +43,10 @@ export default function RequirementDetailPage({
 
   if (requirementType === 'FORUM') {
     return <ForumRequirement id={resolvedParams.id} requirementId={resolvedParams.requirementId} />;
+  }
+
+  if (requirementType === 'QUIZ') {
+    return <QuizRequirementDetail id={resolvedParams.id} requirementId={resolvedParams.requirementId} />;
   }
 
   return <RequirementDetail id={resolvedParams.id} requirementId={resolvedParams.requirementId} />;
