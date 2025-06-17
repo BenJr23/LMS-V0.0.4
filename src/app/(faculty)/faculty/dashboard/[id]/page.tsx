@@ -190,7 +190,7 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
         return;
       }
 
-      const requirementType = selectedRequirementType.replace('S', '') as 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
+      const requirementType = selectedRequirementType as 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
       
       const result = await createRequirement({
         subjectInstanceId: resolvedParams.id,
@@ -222,7 +222,8 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
       }
     } catch (error) {
       console.error('Error creating requirement:', error);
-      toast.error(`Failed to create ${assignmentForm.type.toLowerCase()}`);
+      const requirementType = selectedRequirementType as 'FORUM' | 'QUIZ' | 'ASSIGNMENT' | 'ACTIVITY';
+      toast.error(`Failed to create ${requirementType.toLowerCase()}`);
     }
   };
 
@@ -258,6 +259,10 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   const handleDeleteRequirement = (requirement: Requirement) => {
     setSelectedRequirement(requirement);
     setIsDeleteModalOpen(true);
+  };
+
+  const handleViewRequirement = (requirement: Requirement) => {
+    router.push(`/faculty/dashboard/${resolvedParams.id}/requirements/${requirement.id}`);
   };
 
   if (isLoading) {
@@ -693,6 +698,7 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
                                 <td className="p-4">
                                   <div className="flex items-center gap-2">
                                     <button
+                                      onClick={() => handleViewRequirement(requirement)}
                                       className="p-1.5 rounded-md hover:bg-pink-100 text-[#800000] transition-colors duration-200"
                                       title="View Details"
                                     >
