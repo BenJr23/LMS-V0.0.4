@@ -324,3 +324,50 @@ export async function editRequirement(data: EditRequirementInput) {
     };
   }
 }
+
+export async function deleteRequirement(requirementId: string) {
+  try {
+    const user = await currentUser();
+
+    if (!user || !user.id) {
+      throw new Error('User not authenticated.');
+    }
+
+    // Check if requirement exists and belongs to the user's subject instance
+    const requirement = await prisma.requirement.findFirst({
+      where: {
+        id: requirementId,
+        subjectInstance: {
+          userId: user.id
+        }
+      }
+    });
+
+    if (!requirement) {
+      throw new Error('Requirement not found or you do not have permission to delete it.');
+    }
+
+    // Delete the requirement and all related records in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete all submissions first
+      await tx.submission.deleteMany({
+        where: { requirementId }
+      });
+
+      // Finally, delete the requirement itself
+      await tx.requirement.delete({
+        where: { id: requirementId }
+      });
+    });
+
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Error deleting requirement:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete requirement'
+    };
+  }
+}

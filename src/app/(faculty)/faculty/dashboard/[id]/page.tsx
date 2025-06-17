@@ -4,7 +4,7 @@ import { useState, use, useEffect } from 'react';
 import { Bell, FileText, ClipboardList, File, FileText as FileTextIcon, UserCircle2, Settings, MessageSquare, HelpCircle, Users, Calendar, Plus, Eye, Trash2, AlertTriangle, Pencil } from 'lucide-react';
 import { getSubjectInstance, deleteSubjectInstance } from '@/app/_actions/subjectInstance';
 import { getImageUrl } from '@/app/_actions/uploadIcon';
-import { createRequirement, getRequirements, editRequirement } from '@/app/_actions/requirement';
+import { createRequirement, getRequirements, editRequirement, deleteRequirement } from '@/app/_actions/requirement';
 import toast from 'react-hot-toast';
 import RichTextEditor from '@/components/RichTextEditor';
 import { useRouter } from 'next/navigation';
@@ -279,6 +279,29 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
   const handleDeleteRequirement = (requirement: Requirement) => {
     setSelectedRequirement(requirement);
     setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedRequirement) return;
+
+    try {
+      const result = await deleteRequirement(selectedRequirement.id);
+      if (result.success) {
+        toast.success(`${selectedRequirement.type} deleted successfully`);
+        // Refresh requirements data
+        const updatedRequirements = await getRequirements(resolvedParams.id);
+        if (updatedRequirements.success && updatedRequirements.data) {
+          setRequirements(updatedRequirements.data);
+        }
+      } else {
+        toast.error(result.error || 'Failed to delete requirement');
+      }
+    } catch (error) {
+      console.error('Error deleting requirement:', error);
+      toast.error('Failed to delete requirement');
+    }
+    setIsDeleteModalOpen(false);
+    setSelectedRequirement(null);
   };
 
   const handleViewRequirement = (requirement: Requirement) => {
@@ -572,11 +595,7 @@ export default function SubjectInstancePage({ params }: { params: Promise<{ id: 
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  // TODO: Implement delete functionality
-                  setIsDeleteModalOpen(false);
-                  setSelectedRequirement(null);
-                }}
+                onClick={handleConfirmDelete}
                 className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors duration-200 font-medium"
               >
                 Delete
